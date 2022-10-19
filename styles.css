@@ -1,0 +1,86 @@
+.horiz_rule {
+	margin: 0;
+}
+
+.container {
+	display: flex;
+	width: 100%;
+	padding: 1rem 0;
+	justify-content: space-between;
+}
+
+.sync_text {
+	opacity: 0.5;
+}
+.sync_link {
+	user-select: all;
+	font-weight: 400;
+}
+.sync_icon {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	opacity: 0.5;
+	width: 1rem;
+	height: 1rem;
+	animation-name: spin;
+	animation-duration: 2000ms;
+	animation-iteration-count: infinite;
+	animation-timing-function: linear;
+}
+.sync_icon_still{
+	opacity: 0.5;
+	color: rgb(133, 255, 133);
+}
+.select_inner {
+	display: flex;
+	flex-direction: column;
+}
+.select_innerR {
+	display: flex;
+    gap: 1rem;
+}
+.select_title {
+	color: var(--text-normal);
+	font-size: var(--font-ui-medium);
+	line-height: var(--line-height-tight);
+}
+.select_subtitle {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	padding-top: var(--size-4-1);
+	line-height: var(--line-height-tight);
+}
+
+@-ms-keyframes spin {
+	from {
+		-ms-transform: rotate(0deg);
+	}
+	to {
+		-ms-transform: rotate(360deg);
+	}
+}
+@-moz-keyframes spin {
+	from {
+		-moz-transform: rotate(0deg);
+	}
+	to {
+		-moz-transform: rotate(360deg);
+	}
+}
+@-webkit-keyframes spin {
+	from {
+		-webkit-transform: rotate(0deg);
+	}
+	to {
+		-webkit-transform: rotate(360deg);
+	}
+}
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}

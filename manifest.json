@@ -1,0 +1,10 @@
+{
+	"id": "obsidian-gdrive-sync",
+	"name": "Google Drive Sync",
+	"version": "0.1.0",
+	"minAppVersion": "0.15.0",
+	"description": "Sync vault files to Google Drive",
+	"author": "stravo1",
+	"authorUrl": "https://stravo.live",
+	"isDesktopOnly": false
+}
