@@ -27,9 +27,12 @@ import {
 const getAccessToken = async (refreshToken: string) => {
 	var response;
 	await axios
-		.post("https://ninth-matter-357304.el.r.appspot.com/auth/obsidian/refresh-token", {
-			refreshToken,
-		})
+		.post(
+			"https://ninth-matter-357304.el.r.appspot.com/auth/obsidian/refresh-token",
+			{
+				refreshToken,
+			}
+		)
 		.then((res) => {
 			response = res.data;
 		})
@@ -429,7 +432,8 @@ class syncSettings extends PluginSettingTab {
 				text: "Open this link to log in",
 				cls: "sync_text",
 			});
-			sync_link.href = "https://ninth-matter-357304.el.r.appspot.com/auth/obsidian";
+			sync_link.href =
+				"https://ninth-matter-357304.el.r.appspot.com/auth/obsidian";
 		}
 
 		/* set refresh token input box */
@@ -483,7 +487,8 @@ class syncSettings extends PluginSettingTab {
 							text: "Open this link to log in",
 							cls: "sync_text",
 						});
-						sync_link.href = "http://localhost:3000/auth/obsidian";
+						sync_link.href =
+							"https://ninth-matter-357304.el.r.appspot.com/auth/obsidian";
 					}
 				})
 			);
@@ -558,4 +563,3 @@ class syncSettings extends PluginSettingTab {
 			);
 	}
 }
-
