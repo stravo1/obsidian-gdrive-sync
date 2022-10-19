@@ -39,7 +39,7 @@ const getAccessToken = async (refreshToken: string) => {
 		.catch((err) => {
 			if ((err.code = "ERR_NETWORK")) {
 				new Notice("Oops! Network error :(");
-				new Notice("Or maybe no refresh token provided?");
+				new Notice("Or maybe no refresh token provided?", 5000);
 			}
 
 			response = "error";
@@ -80,7 +80,10 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.settings.vaultId = res;
 		new Notice("Vault created!");
-		new Notice("Uploading files, this might take time. Please wait...");
+		new Notice(
+			"Uploading files, this might take time. Please wait...",
+			6000
+		);
 		var filesList = this.app.vault.getFiles();
 		for (const file of filesList) {
 			const buffer: any = await this.app.vault.readBinary(file);
@@ -92,7 +95,7 @@ export default class driveSyncPlugin extends Plugin {
 			);
 		}
 		new Notice("Files uploaded!");
-		new Notice("Please reload the plug-in.");
+		new Notice("Please reload the plug-in.", 5000);
 	};
 
 	async onload() {
@@ -136,7 +139,8 @@ export default class driveSyncPlugin extends Plugin {
 					`Oops! No vaults named ${this.app.vault.getName()} found in Google Drive`
 				);
 				new Notice(
-					"Try initializing vault in Google Drive from plug-in settings :)"
+					"Try initializing vault in Google Drive from plug-in settings :)",
+					5000
 				);
 			} else {
 				// if vault exists
@@ -191,7 +195,8 @@ export default class driveSyncPlugin extends Plugin {
 				if (e instanceof TFile) {
 					var buffer: any = await this.app.vault.readBinary(e);
 					new Notice(
-						"Please wait while the file is being uploaded..."
+						"Please wait while the file is being uploaded...",
+						5000
 					);
 					await uploadFile(
 						this.settings.accessToken,
@@ -229,13 +234,65 @@ export default class driveSyncPlugin extends Plugin {
 			})
 		);
 
+		this.registerEvent(
+			this.app.workspace.on("file-open", (file) => {
+				if (cloudFiles.includes(file?.path!)) return;
+				new ConfirmUpload(this.app, async () => {
+					// Called when the user clicks the icon.
+					new Notice("Uploading the current file to Google Drive!");
+					var buffer: any = await this.app.vault.readBinary(file!);
+
+					var res = await uploadFile(
+						this.settings.accessToken,
+						file?.path,
+						buffer,
+						this.settings.vaultId
+					).then(async (e) => {
+						cloudFiles.push(file?.path!);
+						this.settings.filesList = await getFilesList(
+							this.settings.accessToken,
+							this.settings.vaultId
+						);
+					});
+					new Notice("Uploaded!");
+				}).open();
+			})
+		);
+
 		// This creates an icon in the left ribbon.
 		const uploadEl = this.addRibbonIcon(
 			"cloud",
 			"Upload Current File",
 			async () => {
+				var file = this.app.workspace.getActiveFile()!;
+				if (!cloudFiles.includes(file?.path!)) {
+					new ConfirmUpload(this.app, async () => {
+						// Called when the user clicks the icon.
+						new Notice(
+							"Uploading the current file to Google Drive!"
+						);
+						var buffer: any = await this.app.vault.readBinary(
+							file!
+						);
+
+						var res = await uploadFile(
+							this.settings.accessToken,
+							file?.path,
+							buffer,
+							this.settings.vaultId
+						).then(async (e) => {
+							cloudFiles.push(file?.path!);
+							this.settings.filesList = await getFilesList(
+								this.settings.accessToken,
+								this.settings.vaultId
+							);
+						});
+						new Notice("Uploaded!");
+					}).open();
+					return;
+				}
 				// Called when the user clicks the icon.
-				new Notice("This is a notice!");
+				new Notice("Uploading the current file to Google Drive!");
 				var buffer: any = await this.app.vault.readBinary(
 					this.app.workspace.getActiveFile()!
 				);
@@ -257,6 +314,13 @@ export default class driveSyncPlugin extends Plugin {
 			"install",
 			"Download Current File",
 			async () => {
+				var ufile = this.app.workspace.getActiveFile()!;
+				if (!cloudFiles.includes(ufile?.path!)) {
+					new Notice(
+						"This file doesn't exist on Google Drive. Please upload it first."
+					);
+					return;
+				}
 				// Called when the user clicks the icon.
 				new Notice("Downloading current file!");
 				var id;
@@ -284,8 +348,35 @@ export default class driveSyncPlugin extends Plugin {
 			id: "drive-upload-current",
 			name: "Upload current file to Google Drive",
 			callback: async () => {
+				var file = this.app.workspace.getActiveFile()!;
+				if (!cloudFiles.includes(file?.path!)) {
+					new ConfirmUpload(this.app, async () => {
+						// Called when the user clicks the icon.
+						new Notice(
+							"Uploading the current file to Google Drive!"
+						);
+						var buffer: any = await this.app.vault.readBinary(
+							file!
+						);
+
+						var res = await uploadFile(
+							this.settings.accessToken,
+							file?.path,
+							buffer,
+							this.settings.vaultId
+						).then(async (e) => {
+							cloudFiles.push(file?.path!);
+							this.settings.filesList = await getFilesList(
+								this.settings.accessToken,
+								this.settings.vaultId
+							);
+						});
+						new Notice("Uploaded!");
+					}).open();
+					return;
+				}
 				// Called when the user clicks the icon.
-				new Notice("This is a notice!");
+				new Notice("Uploading the current file to Google Drive!");
 				var buffer: any = await this.app.vault.readBinary(
 					this.app.workspace.getActiveFile()!
 				);
@@ -308,6 +399,13 @@ export default class driveSyncPlugin extends Plugin {
 			id: "drive-download-current",
 			name: "Download current file from Google Drive",
 			callback: async () => {
+				var ufile = this.app.workspace.getActiveFile()!;
+				if (!cloudFiles.includes(ufile?.path!)) {
+					new Notice(
+						"This file doesn't exist on Google Drive. Please upload it first."
+					);
+					return;
+				}
 				// Called when the user clicks the icon.
 				new Notice("Downloading current file!");
 				var id;
@@ -332,6 +430,8 @@ export default class driveSyncPlugin extends Plugin {
 
 		if (toDownload.length) {
 			new Notice("Downloading missing files");
+			new Notice("Please don't use the app until that is done", 5000);
+			this.settings.refresh = true;
 			for (const dFile of toDownload) {
 				var id;
 				this.settings.filesList.map((file: any) => {
@@ -355,7 +455,13 @@ export default class driveSyncPlugin extends Plugin {
 					});
 			}
 			new Notice("Download complete :)");
+			new Notice(
+				"Sorry to make you wait for so long. Please continue with your work",
+				5000
+			);
+			this.settings.refresh = false;
 		}
+		/*
 		if (toUpload.length) {
 			new Notice("Uploading new files");
 			for (const uFile of toUpload) {
@@ -379,6 +485,7 @@ export default class driveSyncPlugin extends Plugin {
 			);
 			new Notice("Upload complete :)");
 		}
+		*/
 	}
 
 	onunload() {}
@@ -476,8 +583,7 @@ class syncSettings extends PluginSettingTab {
 							cls: "sync_icon_still",
 						});
 						setIcon(sync_icons, "checkmark", 14);
-						new Notice("Log in successful");
-						new Notice("Please reload the plug-in");
+						new Notice("Please reload the plug-in", 5000);
 					} else {
 						this.plugin.settings.accessToken = "";
 						this.plugin.settings.validToken = false;
@@ -563,3 +669,45 @@ class syncSettings extends PluginSettingTab {
 			);
 	}
 }
+
+export class ConfirmUpload extends Modal {
+	onSubmit: () => void;
+
+	constructor(app: App, onSubmit: () => void) {
+		super(app);
+		this.onSubmit = onSubmit;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+
+		contentEl.createEl("h2", { text: "Wait a sec!" });
+
+		new Setting(contentEl).setName(
+			"Seems like this file is missing from Google Drive. Either it has been created while the plug-in was not active or was deleted from your other devices. You can upload it to Google Drive or manually delete it :)"
+		);
+
+		new Setting(contentEl)
+			.addButton((btn) =>
+				btn.setButtonText("Okay").onClick(() => {
+					this.close();
+				})
+			)
+			.addButton((btn) =>
+				btn
+					.setButtonText("Upload")
+					.setCta()
+					.onClick(() => {
+						//console.log(this.app.workspace.getActiveFile());
+						this.close();
+						this.onSubmit();
+					})
+			);
+	}
+
+	onClose() {
+		let { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
