@@ -1,7 +1,5 @@
 import {
 	App,
-	Editor,
-	MarkdownView,
 	Modal,
 	Notice,
 	Plugin,
@@ -28,7 +26,7 @@ const getAccessToken = async (refreshToken: string) => {
 	var response;
 	await axios
 		.post(
-			"https://ninth-matter-357304.el.r.appspot.com/auth/obsidian/refresh-token",
+			"https://red-formula-303406.ue.r.appspot.com/auth/obsidian/refresh-token",
 			{
 				refreshToken,
 			}
@@ -540,7 +538,7 @@ class syncSettings extends PluginSettingTab {
 				cls: "sync_text",
 			});
 			sync_link.href =
-				"https://ninth-matter-357304.el.r.appspot.com/auth/obsidian";
+				"https://red-formula-303406.ue.r.appspot.com/auth/obsidian";
 		}
 
 		/* set refresh token input box */
@@ -594,7 +592,7 @@ class syncSettings extends PluginSettingTab {
 							cls: "sync_text",
 						});
 						sync_link.href =
-							"https://ninth-matter-357304.el.r.appspot.com/auth/obsidian";
+							"https://red-formula-303406.ue.r.appspot.com/auth/obsidian";
 					}
 				})
 			);
