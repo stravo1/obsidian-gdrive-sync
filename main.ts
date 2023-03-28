@@ -172,12 +172,51 @@ export default class driveSyncPlugin extends Plugin {
 		this.registerEvent(
 			this.app.vault.on("rename", async (newFile, oldpath) => {
 				if (this.settings.refresh) return;
+
+				/* this is for newly created files
+				as the new file is always renamed first
+				so it checks that whether the file was already in cloudFiles:
+				if it was there we do normal renaming else we upload the new file
+				*/
+				if (!cloudFiles.includes(oldpath)) {
+					new ConfirmUpload(this.app, async () => {
+						// Called when the user clicks the icon.
+						new Notice(
+							"Uploading the current file to Google Drive!"
+						);
+						if (newFile instanceof TFile) {
+							var buffer: any = await this.app.vault.readBinary(
+								newFile
+							);
+						}
+
+						var res = await uploadFile(
+							this.settings.accessToken,
+							newFile.path,
+							buffer,
+							this.settings.vaultId
+						).then(async (e) => {
+							cloudFiles.push(newFile.path);
+							this.settings.filesList = await getFilesList(
+								this.settings.accessToken,
+								this.settings.vaultId
+							);
+						});
+						new Notice("Uploaded!");
+					}).open();
+					return;
+				}
+
+				/* actual renaming of file */
 				var id;
-				this.settings.filesList.map((file) => {
+				var reqFile = ""; // required for changing the name of the file in the cloudsFile list
+				this.settings.filesList.map((file, index) => {
 					if (file.name == oldpath) {
 						id = file.id;
+						reqFile = file.name;
 					}
 				});
+				cloudFiles[cloudFiles.indexOf(reqFile)] = newFile.path; // update the renamed file in cloudfiles
 				await renameFile(this.settings.accessToken, id, newFile.path);
 				new Notice("Files/Folders renamed!");
 				this.settings.filesList = await getFilesList(
@@ -187,32 +226,32 @@ export default class driveSyncPlugin extends Plugin {
 				);
 			})
 		);
-		this.registerEvent(
-			this.app.vault.on("create", async (e) => {
-				if (this.settings.refresh) return;
-				if (e instanceof TFile) {
-					var buffer: any = await this.app.vault.readBinary(e);
-					new Notice(
-						"Please wait while the file is being uploaded...",
-						5000
-					);
-					await uploadFile(
-						this.settings.accessToken,
-						e.path,
-						buffer,
-						this.settings.vaultId
-					);
-				} else {
-					new Notice("Oops! Something messed up :(");
-				}
-				this.settings.filesList = await getFilesList(
-					// get list of files in the vault
-					this.settings.accessToken,
-					this.settings.vaultId
-				);
-				new Notice("File uploaded");
-			})
-		);
+		// this.registerEvent(
+		// 	this.app.vault.on("create", async (e) => {
+		// 		if (this.settings.refresh) return;
+		// 		if (e instanceof TFile) {
+		// 			var buffer: any = await this.app.vault.readBinary(e);
+		// 			new Notice(
+		// 				"Please wait while the file is being uploaded...",
+		// 				5000
+		// 			);
+		// 			await uploadFile(
+		// 				this.settings.accessToken,
+		// 				e.path,
+		// 				buffer,
+		// 				this.settings.vaultId
+		// 			);
+		// 		} else {
+		// 			new Notice("Oops! Something messed up :(");
+		// 		}
+		// 		this.settings.filesList = await getFilesList(
+		// 			// get list of files in the vault
+		// 			this.settings.accessToken,
+		// 			this.settings.vaultId
+		// 		);
+		// 		new Notice("File uploaded");
+		// 	})
+		// );
 		this.registerEvent(
 			this.app.vault.on("delete", async (e) => {
 				if (this.settings.refresh) return;
@@ -232,30 +271,32 @@ export default class driveSyncPlugin extends Plugin {
 			})
 		);
 
-		this.registerEvent(
-			this.app.workspace.on("file-open", (file) => {
-				if (cloudFiles.includes(file?.path!)) return;
-				new ConfirmUpload(this.app, async () => {
-					// Called when the user clicks the icon.
-					new Notice("Uploading the current file to Google Drive!");
-					var buffer: any = await this.app.vault.readBinary(file!);
+		// this.registerEvent(
+		// 	this.app.workspace.on("file-open", (file) => {
+		// 		if (cloudFiles.includes(file?.path!)) return;
+		// 		setTimeout(() => {
+		// 			new ConfirmUpload(this.app, async () => {
+		// 				// Called when the user clicks the icon.
+		// 				new Notice("Uploading the current file to Google Drive!");
+		// 				var buffer: any = await this.app.vault.readBinary(file!);
 
-					var res = await uploadFile(
-						this.settings.accessToken,
-						file?.path,
-						buffer,
-						this.settings.vaultId
-					).then(async (e) => {
-						cloudFiles.push(file?.path!);
-						this.settings.filesList = await getFilesList(
-							this.settings.accessToken,
-							this.settings.vaultId
-						);
-					});
-					new Notice("Uploaded!");
-				}).open();
-			})
-		);
+		// 				var res = await uploadFile(
+		// 					this.settings.accessToken,
+		// 					file?.path,
+		// 					buffer,
+		// 					this.settings.vaultId
+		// 				).then(async (e) => {
+		// 					cloudFiles.push(file?.path!);
+		// 					this.settings.filesList = await getFilesList(
+		// 						this.settings.accessToken,
+		// 						this.settings.vaultId
+		// 					);
+		// 				});
+		// 				new Notice("Uploaded!");
+		// 			}).open();
+		// 		}, 500);
+		// 	})
+		// );
 
 		// This creates an icon in the left ribbon.
 		const uploadEl = this.addRibbonIcon(
@@ -682,7 +723,7 @@ export class ConfirmUpload extends Modal {
 		contentEl.createEl("h2", { text: "Wait a sec!" });
 
 		new Setting(contentEl).setName(
-			"Seems like this file is missing from Google Drive. Either it has been created while the plug-in was not active or was deleted from your other devices. You can upload it to Google Drive or manually delete it :)"
+			"Seems like this file is missing from Google Drive. Either it has been created recently or was deleted from your other devices. You can upload it to Google Drive or manually delete it :)"
 		);
 
 		new Setting(contentEl)
@@ -708,4 +749,3 @@ export class ConfirmUpload extends Modal {
 		contentEl.empty();
 	}
 }
-
