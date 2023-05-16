@@ -116,7 +116,7 @@ const getFilesList = async (accessToken, vault) => {
 	const response = await requestUrl({
 		url:
 			"https://www.googleapis.com/drive/v3/files" +
-			(vault != null ? `?q='${vault}'%20in%20parents` : ""),
+			(vault != null ? `?q='${vault}'%20in%20parents&fields=files(name, modifiedTime, mimeType, id)` : ""),
 		method: "GET",
 		headers: {
 			Authorization: `Bearer ${accessToken}`,

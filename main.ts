@@ -22,6 +22,8 @@ import {
 	uploadFile,
 	uploadFolder,
 } from "./actions";
+import { setInterval } from "timers/promises";
+
 const getAccessToken = async (refreshToken: string) => {
 	var response;
 	await axios
@@ -54,6 +56,8 @@ interface driveValues {
 	filesList: any[];
 	rootFolderId: any;
 	refresh: boolean;
+	writingFile: boolean;
+	syncQueue: boolean;
 }
 
 const DEFAULT_SETTINGS: driveValues = {
@@ -65,7 +69,12 @@ const DEFAULT_SETTINGS: driveValues = {
 	vaultInit: false,
 	rootFolderId: "",
 	refresh: false,
+	writingFile: false,
+	syncQueue: false,
 };
+
+const metaPattern = /^---\n[\s\S]*---/;
+const driveDataPattern = /\nlastSync:.*\n/;
 
 export default class driveSyncPlugin extends Plugin {
 	settings: driveValues;
@@ -148,6 +157,85 @@ export default class driveSyncPlugin extends Plugin {
 					this.settings.accessToken,
 					this.settings.vaultId
 				);
+				this.registerInterval(
+					window.setInterval(async () => {
+						this.settings.filesList = await getFilesList(
+							// refresh fileslist
+							// get list of files in the vault
+							this.settings.accessToken,
+							this.settings.vaultId
+						);
+						/* refresh both the files list */
+						cloudFiles = [];
+						localFiles = [];
+
+						this.settings.filesList.map((file) =>
+							cloudFiles.push(file.name)
+						);
+						this.app.vault
+							.getFiles()
+							.map((file) => localFiles.push(file.path));
+
+						toDownload = cloudFiles.filter(
+							(file) => !localFiles.includes(file)
+						);
+
+						/* delete tracked but not-in-drive-anymore files */
+						this.app.vault.getFiles().map(async (file) => {
+							if (!cloudFiles.includes(file.path)) {
+								var content = await this.app.vault.read(file);
+								if (driveDataPattern.test(content)) {
+									this.app.vault.delete(file);
+								}
+							}
+						});
+
+						/* download new files or files that were renamed */
+						if (toDownload.length) {
+							new Notice("Downloading missing files", 2500);
+
+							this.settings.refresh = true;
+							for (const dFile of toDownload) {
+								var id;
+								this.settings.filesList.map((file: any) => {
+									//console.log(file.name);
+
+									if (file.name == dFile) {
+										id = file.id;
+									}
+								});
+								//console.log(id, dFile);
+
+								var file = await getFile(
+									this.settings.accessToken,
+									id
+								);
+								await this.app.vault
+									.createBinary(file[0], file[1])
+									.catch(async () => {
+										var path = file[0]
+											.split("/")
+											.slice(0, -1)
+											.join("/");
+										//console.log(path);
+
+										await this.app.vault.createFolder(path);
+										await this.app.vault.createBinary(
+											file[0],
+											file[1]
+										);
+									});
+							}
+							new Notice("Download complete :)", 2500);
+							// new Notice(
+							// 	"Sorry to make you wait for so long. Please continue with your work",
+							// 	5000
+							// );
+							this.settings.refresh = false;
+						}
+						//console.log("refreshing filelist...");
+					}, 5000)
+				);
 			}
 		}
 
@@ -179,31 +267,47 @@ export default class driveSyncPlugin extends Plugin {
 				if it was there we do normal renaming else we upload the new file
 				*/
 				if (!cloudFiles.includes(oldpath)) {
-					new ConfirmUpload(this.app, async () => {
-						// Called when the user clicks the icon.
-						new Notice(
-							"Uploading the current file to Google Drive!"
-						);
-						if (newFile instanceof TFile) {
-							var buffer: any = await this.app.vault.readBinary(
-								newFile
-							);
-						}
+					if (!(newFile instanceof TFile)) return;
+					this.settings.writingFile = true;
+					var content = await this.app.vault.read(newFile);
 
-						var res = await uploadFile(
+					var metaExists = metaPattern.test(content);
+					var driveDataExists = driveDataPattern.test(content);
+					if (!metaExists) {
+						await this.app.vault.modify(
+							newFile,
+							`---\nlastSync:${new Date().toString()}\n---\n` +
+								content
+						);
+					} else if (!driveDataExists) {
+						await this.app.vault.modify(
+							newFile,
+							content.replace(
+								/^---\n/g,
+								`---\nlastSync:${new Date().toString()}\n`
+							)
+						);
+					}
+
+					new Notice("Uploading the current file to Google Drive!");
+
+					var buffer: any = await this.app.vault.readBinary(newFile);
+
+					uploadFile(
+						this.settings.accessToken,
+						newFile.path,
+						buffer,
+						this.settings.vaultId
+					).then(async (e) => {
+						this.settings.writingFile = false;
+						cloudFiles.push(newFile.path);
+						this.settings.filesList = await getFilesList(
 							this.settings.accessToken,
-							newFile.path,
-							buffer,
 							this.settings.vaultId
-						).then(async (e) => {
-							cloudFiles.push(newFile.path);
-							this.settings.filesList = await getFilesList(
-								this.settings.accessToken,
-								this.settings.vaultId
-							);
-						});
-						new Notice("Uploaded!");
-					}).open();
+						);
+					});
+					new Notice("Uploaded!");
+
 					return;
 				}
 
@@ -270,33 +374,118 @@ export default class driveSyncPlugin extends Plugin {
 				);
 			})
 		);
+		this.registerEvent(
+			this.app.vault.on("modify", async (e) => {
+				this.settings.syncQueue = true;
+				if (!(e instanceof TFile) || this.settings.writingFile) {
+					// skip folders
+					return;
+				}
 
-		// this.registerEvent(
-		// 	this.app.workspace.on("file-open", (file) => {
-		// 		if (cloudFiles.includes(file?.path!)) return;
-		// 		setTimeout(() => {
-		// 			new ConfirmUpload(this.app, async () => {
-		// 				// Called when the user clicks the icon.
-		// 				new Notice("Uploading the current file to Google Drive!");
-		// 				var buffer: any = await this.app.vault.readBinary(file!);
+				var content = await this.app.vault.read(e);
 
-		// 				var res = await uploadFile(
-		// 					this.settings.accessToken,
-		// 					file?.path,
-		// 					buffer,
-		// 					this.settings.vaultId
-		// 				).then(async (e) => {
-		// 					cloudFiles.push(file?.path!);
-		// 					this.settings.filesList = await getFilesList(
-		// 						this.settings.accessToken,
-		// 						this.settings.vaultId
-		// 					);
-		// 				});
-		// 				new Notice("Uploaded!");
-		// 			}).open();
-		// 		}, 500);
-		// 	})
-		// );
+				var metaExists = metaPattern.test(content);
+				var driveDataExists = driveDataPattern.test(content);
+
+				this.settings.writingFile = true;
+
+				if (metaExists) {
+					if (driveDataExists) {
+						await this.app.vault.modify(
+							e,
+							content.replace(
+								driveDataPattern,
+								`\nlastSync:${new Date().toString()}\n`
+							)
+						);
+					} else {
+						await this.app.vault.modify(
+							e,
+							content.replace(
+								/^---\n/g,
+								`---\nlastSync:${new Date().toString()}\n`
+							)
+						);
+					}
+				} else {
+					await this.app.vault.modify(
+						e,
+						`---\nlastSync:${new Date().toString()}\n---\n` +
+							content
+					);
+				}
+				var id;
+				this.settings.filesList.map((file: any) => {
+					if (file.name == e.path) {
+						id = file.id;
+					}
+				});
+				var buffer = await this.app.vault.readBinary(e);
+				while (this.settings.syncQueue) {
+					this.settings.syncQueue = false;
+					var res = await modifyFile(
+						this.settings.accessToken,
+						id,
+						buffer
+					);
+					//console.log("refreshed!");
+				}
+
+				this.settings.writingFile = false;
+			})
+		);
+		this.registerEvent(
+			this.app.workspace.on("file-open", async (file) => {
+				if (cloudFiles.includes(file?.path!)) {
+					var index = cloudFiles.indexOf(file?.path!);
+
+					var cloudDate = new Date(
+						this.settings.filesList[index].modifiedTime
+					);
+
+					var content = await this.app.vault.read(file!);
+
+					var timeStamp = content.match(/lastSync:.*/);
+					var localDate = new Date(timeStamp![0]);
+
+					if (
+						cloudDate.getTime() >
+						localDate.getTime() + 2000 /* allow 1sec delay */
+					) {
+						new Notice("Downloading current file!");
+						var id;
+						this.settings.filesList.map((file: any) => {
+							if (
+								file.name ==
+								this.app.workspace.getActiveFile()?.path
+							) {
+								id = file.id;
+							}
+						});
+						var res = await getFile(this.settings.accessToken, id);
+						await this.app.vault
+							.modifyBinary(
+								this.app.workspace.getActiveFile()!,
+								res[1]
+							)
+							.catch(async () => {
+								var path = res[0]
+									.split("/")
+									.slice(0, -1)
+									.join("/");
+								//console.log(path);
+
+								await this.app.vault.createFolder(path);
+								await this.app.vault.modifyBinary(
+									res[0],
+									res[1]
+								);
+							});
+						new Notice("Sync complete :)");
+					}
+				}
+			})
+		);
 
 		// This creates an icon in the left ribbon.
 		const uploadEl = this.addRibbonIcon(
@@ -467,39 +656,6 @@ export default class driveSyncPlugin extends Plugin {
 			},
 		});
 
-		if (toDownload.length) {
-			new Notice("Downloading missing files");
-			new Notice("Please don't use the app until that is done", 5000);
-			this.settings.refresh = true;
-			for (const dFile of toDownload) {
-				var id;
-				this.settings.filesList.map((file: any) => {
-					//console.log(file.name);
-
-					if (file.name == dFile) {
-						id = file.id;
-					}
-				});
-				//console.log(id, dFile);
-
-				var file = await getFile(this.settings.accessToken, id);
-				await this.app.vault
-					.createBinary(file[0], file[1])
-					.catch(async () => {
-						var path = file[0].split("/").slice(0, -1).join("/");
-						//console.log(path);
-
-						await this.app.vault.createFolder(path);
-						await this.app.vault.createBinary(file[0], file[1]);
-					});
-			}
-			new Notice("Download complete :)");
-			new Notice(
-				"Sorry to make you wait for so long. Please continue with your work",
-				5000
-			);
-			this.settings.refresh = false;
-		}
 		/*
 		if (toUpload.length) {
 			new Notice("Uploading new files");
