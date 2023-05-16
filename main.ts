@@ -445,11 +445,13 @@ export default class driveSyncPlugin extends Plugin {
 					var content = await this.app.vault.read(file!);
 
 					var timeStamp = content.match(/lastSync:.*/);
-					var localDate = new Date(timeStamp![0]);
+					// var localDate = new Date(timeStamp![0]);
 
 					if (
+						!timeStamp ||
 						cloudDate.getTime() >
-						localDate.getTime() + 2000 /* allow 1sec delay */
+							new Date(timeStamp![0]).getTime() +
+								2000 /* allow 1sec delay */
 					) {
 						new Notice("Downloading current file!");
 						var id;
