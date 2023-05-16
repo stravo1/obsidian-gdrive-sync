@@ -269,8 +269,27 @@ export default class driveSyncPlugin extends Plugin {
 				if (!cloudFiles.includes(oldpath)) {
 					if (!(newFile instanceof TFile)) return;
 					this.settings.writingFile = true;
-					var content = await this.app.vault.read(newFile);
 
+					new Notice("Uploading new file to Google Drive!");
+
+					var buffer: any = await this.app.vault.readBinary(newFile);
+
+					var res = uploadFile(
+						this.settings.accessToken,
+						newFile.path,
+						buffer,
+						this.settings.vaultId
+					);
+					this.settings.writingFile = false;
+					cloudFiles.push(newFile.path);
+					this.settings.filesList = await getFilesList(
+						this.settings.accessToken,
+						this.settings.vaultId
+					);
+
+					new Notice("Uploaded!");
+
+					var content = await this.app.vault.read(newFile);
 					var metaExists = metaPattern.test(content);
 					var driveDataExists = driveDataPattern.test(content);
 					if (!metaExists) {
@@ -288,26 +307,6 @@ export default class driveSyncPlugin extends Plugin {
 							)
 						);
 					}
-
-					new Notice("Uploading the current file to Google Drive!");
-
-					var buffer: any = await this.app.vault.readBinary(newFile);
-
-					uploadFile(
-						this.settings.accessToken,
-						newFile.path,
-						buffer,
-						this.settings.vaultId
-					).then(async (e) => {
-						this.settings.writingFile = false;
-						cloudFiles.push(newFile.path);
-						this.settings.filesList = await getFilesList(
-							this.settings.accessToken,
-							this.settings.vaultId
-						);
-					});
-					new Notice("Uploaded!");
-
 					return;
 				}
 
