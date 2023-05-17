@@ -82,6 +82,7 @@ const renameFile = async (accessToken, fileId, newName) => {
 };
 
 const deleteFile = async (accessToken, fileId) => {
+	var flag = true;
 	const response = await requestUrl({
 		url: `https://www.googleapis.com/drive/v3/files/${fileId}`,
 		method: "DELETE",
@@ -89,7 +90,11 @@ const deleteFile = async (accessToken, fileId) => {
 			Authorization: `Bearer ${accessToken}`,
 			"Content-Type": "application/json",
 		},
-	}).catch((e) => console.log(e));
+	}).catch((e) => {
+		console.log(e);
+		flag = false;
+	});
+	return flag;
 };
 
 const uploadFolder = async (accessToken, foldername, rootId = null) => {
@@ -116,7 +121,9 @@ const getFilesList = async (accessToken, vault) => {
 	const response = await requestUrl({
 		url:
 			"https://www.googleapis.com/drive/v3/files" +
-			(vault != null ? `?q='${vault}'%20in%20parents&fields=files(name, modifiedTime, mimeType, id)` : ""),
+			(vault != null
+				? `?q='${vault}'%20in%20parents&fields=files(name, modifiedTime, mimeType, id)`
+				: ""),
 		method: "GET",
 		headers: {
 			Authorization: `Bearer ${accessToken}`,
