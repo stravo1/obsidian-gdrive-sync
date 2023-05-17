@@ -177,7 +177,7 @@ export default class driveSyncPlugin extends Plugin {
 		//console.log("refreshing filelist...");
 	};
 	getLatestContent = async (file: TFile) => {
-		if (this.cloudFiles.includes(file?.path!)) {
+		if (this.cloudFiles.includes(file?.path!) && !this.settings.syncQueue) {
 			var index = this.cloudFiles.indexOf(file?.path!);
 
 			var cloudDate = new Date(
@@ -204,6 +204,9 @@ export default class driveSyncPlugin extends Plugin {
 					}
 				});
 				var res = await getFile(this.settings.accessToken, id);
+				if (this.settings.syncQueue) return;
+				console.log(this.settings.syncQueue);
+
 				await this.app.vault
 					.modifyBinary(this.app.workspace.getActiveFile()!, res[1])
 					.catch(async () => {
@@ -408,6 +411,7 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.vault.on("modify", async (e) => {
+				this.settings.syncQueue = true;
 				if (!(e instanceof TFile) || this.settings.writingFile) {
 					return;
 				}
@@ -416,12 +420,6 @@ export default class driveSyncPlugin extends Plugin {
 				}
 				this.timer = setTimeout(async () => {
 					console.log("UPDATING FILE");
-
-					this.settings.syncQueue = true;
-					if (!(e instanceof TFile) || this.settings.writingFile) {
-						// skip folders
-						return;
-					}
 
 					var content = await this.app.vault.read(e);
 
