@@ -191,14 +191,20 @@ export default class driveSyncPlugin extends Plugin {
 			var cloudDate = new Date(
 				this.settings.filesList[index].modifiedTime
 			);
+			var content: string;
+			var timeStamp: any;
+			var isBinaryFile: boolean = false;
 
-			var content = await this.app.vault.read(file!);
-
-			var timeStamp = content.match(/lastSync:.*/);
+			if (file.extension != "md") {
+				content = await this.app.vault.read(file!);
+				timeStamp = content.match(/lastSync:.*/);
+				isBinaryFile = true;
+			}
 
 			//console.log(cloudDate, new Date(timeStamp![0]));
 
 			if (
+				isBinaryFile ||
 				!timeStamp ||
 				cloudDate.getTime() >
 					new Date(timeStamp![0]).getTime() +
@@ -206,9 +212,9 @@ export default class driveSyncPlugin extends Plugin {
 			) {
 				// new Notice("Downloading updated file!");
 				var id;
-				this.settings.filesList.map((file: any) => {
-					if (file.name == this.app.workspace.getActiveFile()?.path) {
-						id = file.id;
+				this.settings.filesList.map((fileItem: any) => {
+					if (fileItem.name == file.path) {
+						id = fileItem.id;
 					}
 				});
 				var res = await getFile(this.settings.accessToken, id);
@@ -216,7 +222,7 @@ export default class driveSyncPlugin extends Plugin {
 				//console.log(this.syncQueue);
 
 				await this.app.vault
-					.modifyBinary(this.app.workspace.getActiveFile()!, res[1])
+					.modifyBinary(file, res[1])
 					.catch(async () => {
 						var path = res[0].split("/").slice(0, -1).join("/");
 						//console.log(path);
