@@ -185,7 +185,6 @@ export default class driveSyncPlugin extends Plugin {
 		//console.log("refreshing filelist...");
 	};
 	getLatestContent = async (file: TFile) => {
-
 		if (this.cloudFiles.includes(file?.path!) && !this.syncQueue) {
 			var index = this.cloudFiles.indexOf(file?.path!);
 
@@ -434,7 +433,6 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.vault.on("modify", async (e) => {
-
 				this.syncQueue = true;
 				if (!(e instanceof TFile) || this.writingFile) {
 					return;
@@ -501,7 +499,7 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.workspace.on("file-open", async (file) => {
-				this.getLatestContent(file!);
+				if (file?.extension == "md") this.getLatestContent(file!);
 			})
 		);
 
