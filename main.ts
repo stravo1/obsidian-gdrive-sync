@@ -251,16 +251,17 @@ export default class driveSyncPlugin extends Plugin {
 			var isBinaryFile: boolean = false;
 
 			if (file.extension != "md") {
+				isBinaryFile = true;
+			} else {
 				content = await this.app.vault.read(file!);
 				timeStamp = content.match(/lastSync:.*/);
-				isBinaryFile = true;
 			}
 
 			//console.log(cloudDate, new Date(timeStamp![0]));
 
 			if (
 				isBinaryFile ||
-				!timeStamp ||
+				!timeStamp /* check if timeStamp is present */ ||
 				cloudDate.getTime() >
 					new Date(timeStamp![0]).getTime() +
 						3000 /* allow 3sec delay in 'localDate' */
@@ -273,7 +274,7 @@ export default class driveSyncPlugin extends Plugin {
 					}
 				});
 				var res = await getFile(this.settings.accessToken, id);
-				if (this.syncQueue) return;
+				if (this.syncQueue && !isBinaryFile) return;
 				//console.log(this.syncQueue);
 
 				await this.app.vault
@@ -464,7 +465,12 @@ export default class driveSyncPlugin extends Plugin {
 					return;
 				}
 				this.syncQueue = true;
-				if (!(e instanceof TFile) || this.writingFile) {
+
+				if (
+					!(e instanceof TFile) ||
+					this.writingFile ||
+					e.extension != "md"
+				) {
 					return;
 				}
 				if (this.timer) {
@@ -513,18 +519,18 @@ export default class driveSyncPlugin extends Plugin {
 					});
 					var buffer = await this.app.vault.readBinary(e);
 					while (this.syncQueue) {
-						this.syncQueue = false;
 						var res = await modifyFile(
 							this.settings.accessToken,
 							id,
 							buffer
 						);
 						//console.log("refreshed!");
+						this.syncQueue = false;
 					}
 
 					this.writingFile = false;
 					this.timer = null;
-				}, 2500);
+				}, 2250);
 			})
 		);
 		this.registerEvent(
