@@ -22,7 +22,6 @@ import {
 	uploadFile,
 	uploadFolder,
 } from "./actions";
-import { setInterval } from "timers/promises";
 
 const getAccessToken = async (refreshToken: string) => {
 	var response;
@@ -83,6 +82,7 @@ export default class driveSyncPlugin extends Plugin {
 	cloudFiles: string[] = [];
 	localFiles: string[] = [];
 	timer: any = null;
+	alreadyRefreshing: boolean = false;
 	writingFile: boolean = false;
 	syncQueue: boolean = false;
 	currentlyUploading: string | null = null; // to mitigate the issue of deleting recently created file while its being uploaded and gets overlaped with the auto-trash function call
@@ -115,6 +115,11 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	refreshAll = async () => {
+		if(this.alreadyRefreshing){
+			return;
+		} else {
+			this.alreadyRefreshing = true;
+		}
 		this.settings.filesList = await getFilesList(
 			// refresh fileslist
 			// get list of files in the vault
@@ -188,6 +193,7 @@ export default class driveSyncPlugin extends Plugin {
 			this.settings.refresh = false;
 		}
 		this.getLatestContent(this.app.workspace.getActiveFile()!);
+		this.alreadyRefreshing = false;
 		//console.log("refreshing filelist...");
 	};
 	uploadNewNotesFile = async (newFile: TFile) => {
@@ -239,7 +245,10 @@ export default class driveSyncPlugin extends Plugin {
 		new Notice("Uploaded!");
 	};
 
-	getLatestContent = async (file: TFile) => {
+	getLatestContent = async (
+		file: TFile,
+		forced: "forced" | false = false
+	) => {
 		if (this.cloudFiles.includes(file?.path!) && !this.syncQueue) {
 			var index = this.cloudFiles.indexOf(file?.path!);
 
@@ -260,6 +269,7 @@ export default class driveSyncPlugin extends Plugin {
 			//console.log(cloudDate, new Date(timeStamp![0]));
 
 			if (
+				forced == "forced" ||
 				isBinaryFile ||
 				!timeStamp /* check if timeStamp is present */ ||
 				cloudDate.getTime() >
@@ -282,7 +292,7 @@ export default class driveSyncPlugin extends Plugin {
 					.catch(async () => {
 						var path = res[0].split("/").slice(0, -1).join("/");
 						//console.log(path);
-
+						
 						await this.app.vault.createFolder(path);
 						await this.app.vault.modifyBinary(res[0], res[1]);
 					});
@@ -584,7 +594,7 @@ export default class driveSyncPlugin extends Plugin {
 				}
 				// Called when the user clicks the icon.
 				new Notice("Downloading current file!");
-				await this.getLatestContent(ufile);
+				await this.getLatestContent(ufile, "forced");
 				new Notice("Sync complete :)");
 			}
 		);
@@ -635,7 +645,7 @@ export default class driveSyncPlugin extends Plugin {
 				}
 				// Called when the user clicks the icon.
 				new Notice("Downloading current file!");
-				await this.getLatestContent(ufile);
+				await this.getLatestContent(ufile, "forced");
 				new Notice("Sync complete :)");
 			},
 		});
