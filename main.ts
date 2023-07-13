@@ -56,6 +56,7 @@ interface driveValues {
 	rootFolderId: any;
 	refresh: boolean;
 	refreshTime: string;
+	autoRefreshBinaryFiles: string;
 	//writingFile: boolean;
 	//syncQueue: boolean;
 }
@@ -70,6 +71,7 @@ const DEFAULT_SETTINGS: driveValues = {
 	rootFolderId: "",
 	refresh: false,
 	refreshTime: "5",
+	autoRefreshBinaryFiles: "0",
 	//writingFile: false,
 	//syncQueue: false,
 };
@@ -115,7 +117,7 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	refreshAll = async () => {
-		if(this.alreadyRefreshing){
+		if (this.alreadyRefreshing) {
 			return;
 		} else {
 			this.alreadyRefreshing = true;
@@ -270,11 +272,12 @@ export default class driveSyncPlugin extends Plugin {
 
 			if (
 				forced == "forced" ||
-				isBinaryFile ||
-				!timeStamp /* check if timeStamp is present */ ||
-				cloudDate.getTime() >
-					new Date(timeStamp![0]).getTime() +
-						3000 /* allow 3sec delay in 'localDate' */
+				(isBinaryFile &&
+					parseInt(this.settings.autoRefreshBinaryFiles)) ||
+				(timeStamp /* check if timeStamp is present */ &&
+					cloudDate.getTime() >
+						new Date(timeStamp![0]).getTime() +
+							3000) /* allow 3sec delay in 'localDate' */
 			) {
 				// new Notice("Downloading updated file!");
 				var id;
@@ -292,7 +295,7 @@ export default class driveSyncPlugin extends Plugin {
 					.catch(async () => {
 						var path = res[0].split("/").slice(0, -1).join("/");
 						//console.log(path);
-						
+
 						await this.app.vault.createFolder(path);
 						await this.app.vault.modifyBinary(res[0], res[1]);
 					});
@@ -813,6 +816,19 @@ class syncSettings extends PluginSettingTab {
 						this.plugin.settings.refreshTime = value;
 					})
 			);
+		new Setting(containerEl)
+			.setName("Auto refresh binary files")
+			.setDesc(
+				"Experimental: Automatically fetch lastest binary files. Currently this plugin doesn't completely support binary file sync."
+			)
+			.addDropdown((selector) => {
+				selector.addOption("1", "Fetch");
+				selector.addOption("0", "Don't fetch");
+				selector.setValue(this.plugin.settings.autoRefreshBinaryFiles);
+				selector.onChange((val) => {
+					this.plugin.settings.autoRefreshBinaryFiles = val;
+				});
+			});
 		new Setting(containerEl)
 			.setName("Upload all")
 			.setDesc(
