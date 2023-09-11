@@ -216,14 +216,14 @@ export default class driveSyncPlugin extends Plugin {
 		if (!metaExists) {
 			await this.app.vault.modify(
 				newFile,
-				`---\nlastSync:${new Date().toString()}\n---\n` + content
+				`---\nlastSync: ${new Date().toString()}\n---\n` + content
 			);
 		} else if (!driveDataExists) {
 			await this.app.vault.modify(
 				newFile,
 				content.replace(
 					/^---\n/g,
-					`---\nlastSync:${new Date().toString()}\n`
+					`---\nlastSync: ${new Date().toString()}\n`
 				)
 			);
 		}
@@ -505,7 +505,7 @@ export default class driveSyncPlugin extends Plugin {
 								e,
 								content.replace(
 									driveDataPattern,
-									`\nlastSync:${new Date().toString()}\n`
+									`\nlastSync: ${new Date().toString()}\n`
 								)
 							);
 						} else {
@@ -513,14 +513,14 @@ export default class driveSyncPlugin extends Plugin {
 								e,
 								content.replace(
 									/^---\n/g,
-									`---\nlastSync:${new Date().toString()}\n`
+									`---\nlastSync: ${new Date().toString()}\n`
 								)
 							);
 						}
 					} else {
 						this.app.vault.modify(
 							e,
-							`---\nlastSync:${new Date().toString()}\n---\n` +
+							`---\nlastSync: ${new Date().toString()}\n---\n` +
 								content
 						);
 					}
