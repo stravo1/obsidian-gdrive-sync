@@ -88,6 +88,8 @@ export default class driveSyncPlugin extends Plugin {
 	writingFile: boolean = false;
 	syncQueue: boolean = false;
 	currentlyUploading: string | null = null; // to mitigate the issue of deleting recently created file while its being uploaded and gets overlaped with the auto-trash function call
+	renamingList: string[] = [];
+	deletingList: string[] = [];
 
 	cleanInstall = async () => {
 		new Notice("Creating vault in Google Drive...");
@@ -138,13 +140,17 @@ export default class driveSyncPlugin extends Plugin {
 			.map((file) => this.localFiles.push(file.path));
 
 		var toDownload = this.cloudFiles.filter(
-			(file) => !this.localFiles.includes(file)
+			(file) =>
+				!this.localFiles.includes(file) && // is not currently in vault
+				!this.renamingList.includes(file) && // is not currently being renamed
+				!this.deletingList.includes(file) // is not currently being deleted
 		);
 
 		/* delete tracked but not-in-drive-anymore files */
 		this.app.vault.getFiles().map(async (file) => {
 			if (
 				!this.cloudFiles.includes(file.path) &&
+				!this.renamingList.includes(file.path) &&
 				file.path != this.currentlyUploading
 			) {
 				if (file.extension != "md") {
@@ -186,6 +192,7 @@ export default class driveSyncPlugin extends Plugin {
 						await this.app.vault.createFolder(path);
 						await this.app.vault.createBinary(file[0], file[1]);
 					});
+					new Notice(`Downloaded ${toDownload.indexOf(dFile)+1}/${toDownload.length} files`, 1000)
 			}
 			new Notice("Download complete :)", 2500);
 			// new Notice(
@@ -374,8 +381,6 @@ export default class driveSyncPlugin extends Plugin {
 
 		this.registerEvent(
 			this.app.vault.on("rename", async (newFile, oldpath) => {
-				if (this.settings.refresh) return;
-
 				/* this is for newly created files
 				as the newly created file is always renamed first
 				so it checks that whether the file was already in cloudFiles:
@@ -385,6 +390,7 @@ export default class driveSyncPlugin extends Plugin {
 					if (newFile instanceof TFile) {
 						this.uploadNewNotesFile(newFile);
 					}
+					return;
 				}
 
 				/* actual renaming of file */
@@ -396,10 +402,15 @@ export default class driveSyncPlugin extends Plugin {
 						reqFile = file.name;
 					}
 				});
+				this.renamingList.push(oldpath);
+
 				this.cloudFiles[this.cloudFiles.indexOf(reqFile)] =
 					newFile.path; // update the renamed file in cloudfiles
 				await renameFile(this.settings.accessToken, id, newFile.path);
 				new Notice("Files/Folders renamed!");
+
+				this.renamingList.splice(this.renamingList.indexOf(oldpath), 1);
+
 				this.settings.filesList = await getFilesList(
 					// get list of files in the vault
 					this.settings.accessToken,
@@ -457,11 +468,16 @@ export default class driveSyncPlugin extends Plugin {
 						id = file.id;
 					}
 				});
+				this.deletingList.push(e.path);
+
 				var successful = await deleteFile(
 					this.settings.accessToken,
 					id
 				);
 				if (successful) new Notice("File deleted!"); // only when actual file from the drive was deleted
+
+				this.deletingList.splice(this.deletingList.indexOf(e.path), 1);
+
 				this.settings.filesList = await getFilesList(
 					// get list of files in the vault
 					this.settings.accessToken,
@@ -724,7 +740,7 @@ class syncSettings extends PluginSettingTab {
 				cls: "sync_text",
 			});
 			const sync_icons = sync.createDiv({ cls: "sync_icon_still" });
-			setIcon(sync_icons, "checkmark", 14);
+			setIcon(sync_icons, "checkmark");
 		} else {
 			// display login link
 			const sync_link = sync.createEl("a", {
@@ -757,7 +773,7 @@ class syncSettings extends PluginSettingTab {
 						cls: "sync_text",
 					});
 					const sync_icons = sync.createDiv({ cls: "sync_icon" });
-					setIcon(sync_icons, "sync", 14);
+					setIcon(sync_icons, "sync");
 					var res: any = await getAccessToken(
 						this.plugin.settings.refreshToken
 					); // check for accesstoken
@@ -774,7 +790,7 @@ class syncSettings extends PluginSettingTab {
 						const sync_icons = sync.createDiv({
 							cls: "sync_icon_still",
 						});
-						setIcon(sync_icons, "checkmark", 14);
+						setIcon(sync_icons, "checkmark");
 						new Notice("Please reload the plug-in", 5000);
 					} else {
 						this.plugin.settings.accessToken = "";
