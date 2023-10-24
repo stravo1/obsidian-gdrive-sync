@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Obsidian Google Drive Auto Sync Plugin is a user-friendly Obsidian plugin that allows you to seamlessly sync your notes with Google Drive, a free alternative to the paid [Obsidian Sync](https://obsidian.md/sync) service. With just a few simple steps, you can enable automatic synchronization and enjoy the convenience of accessing your notes from any device, be it mobile or dekstop, always up-to-date!
+The Obsidian Google Drive Sync Plugin is a plugin that allows you to seamlessly sync your notes across devices with Google Drive. It is a free alternative to the paid [Obsidian Sync](https://obsidian.md/sync) service. With just a few simple steps, you can enable auto sync and enjoy the convenience of accessing your notes from any device, be it mobile or dekstop, always up-to-date!
 
 This plugin is designed to be easy to install and configure compared to other plugins, no need to tackle git repos or manage Google Cloud Projects or setup any other external app.
 
