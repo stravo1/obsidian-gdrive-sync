@@ -90,6 +90,7 @@ export default class driveSyncPlugin extends Plugin {
 	currentlyUploading: string | null = null; // to mitigate the issue of deleting recently created file while its being uploaded and gets overlaped with the auto-trash function call
 	renamingList: string[] = [];
 	deletingList: string[] = [];
+	statusBarItem = this.addStatusBarItem().createEl("span","sync_icon_still");
 
 	cleanInstall = async () => {
 		new Notice("Creating vault in Google Drive...");
@@ -192,7 +193,12 @@ export default class driveSyncPlugin extends Plugin {
 						await this.app.vault.createFolder(path);
 						await this.app.vault.createBinary(file[0], file[1]);
 					});
-					new Notice(`Downloaded ${toDownload.indexOf(dFile)+1}/${toDownload.length} files`, 1000)
+				new Notice(
+					`Downloaded ${toDownload.indexOf(dFile) + 1}/${
+						toDownload.length
+					} files`,
+					1000
+				);
 			}
 			new Notice("Download complete :)", 2500);
 			// new Notice(
@@ -507,6 +513,8 @@ export default class driveSyncPlugin extends Plugin {
 				}
 				this.timer = setTimeout(async () => {
 					//console.log("UPDATING FILE");
+					this.statusBarItem.classList.replace("sync_icon_still","sync_icon")
+					setIcon(this.statusBarItem, "sync");
 
 					var content = await this.app.vault.read(e);
 
@@ -559,6 +567,8 @@ export default class driveSyncPlugin extends Plugin {
 
 					this.writingFile = false;
 					this.timer = null;
+					this.statusBarItem.classList.replace("sync_icon", "sync_icon_still")
+					setIcon(this.statusBarItem, "checkmark");
 				}, 2250);
 			})
 		);
@@ -669,31 +679,7 @@ export default class driveSyncPlugin extends Plugin {
 			},
 		});
 
-		/*
-		if (toUpload.length) {
-			new Notice("Uploading new files");
-			for (const uFile of toUpload) {
-				var upload: TFile;
-				this.app.vault.getFiles().map((file) => {
-					if (file.path == uFile) {
-						upload = file;
-					}
-				});
-
-				var buffer: any = await this.app.vault.readBinary(upload!);
-				await uploadFile(
-					this.settings.accessToken,
-					upload!.path,
-					buffer,
-					this.settings.vaultId
-				);
-			}
-			this.settings.filesList = await getFilesList(
-				this.settings.accessToken
-			);
-			new Notice("Upload complete :)");
-		}
-		*/
+		
 	}
 
 	onunload() {}
