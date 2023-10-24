@@ -1,4 +1,4 @@
-# Obsidian Google Drive Auto Sync Plugin
+# Obsidian Google Drive Sync Plugin
 
 ## Overview
 
