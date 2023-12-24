@@ -1,5 +1,9 @@
 import { requestUrl } from "obsidian";
 
+const newError = (actionName) => {
+	return new Error("ERROR: Unable to complete action: " + actionName)
+}
+
 const getVaultId = async (accessToken, vault, root = null) => {
 	try {
 		const response = await requestUrl({
@@ -16,7 +20,8 @@ const getVaultId = async (accessToken, vault, root = null) => {
 		var vaultId = vaultFolder.length ? vaultFolder[0].id : "NOT FOUND";
 		return vaultId;
 	} catch (err) {
-		return "ERROR";
+		throw newError("getVaultId");
+
 	}
 };
 
@@ -56,7 +61,8 @@ const uploadFile = async (
 		}
 		return id;
 	} catch (err) {
-		return "ERROR";
+		throw newError("uploadFile");
+
 	}
 };
 
@@ -73,7 +79,8 @@ const modifyFile = async (accessToken, fileId, buffer) => {
 		}).catch((e) => console.log(e));
 		return res;
 	} catch (err) {
-		return "ERROR";
+		throw newError("modifyFile");
+
 	}
 };
 const renameFile = async (accessToken, fileId, newName) => {
@@ -93,7 +100,8 @@ const renameFile = async (accessToken, fileId, newName) => {
 		var id = response.json.id;
 		return id;
 	} catch (err) {
-		return "ERROR";
+		throw newError("renameFile")
+
 	}
 };
 
@@ -113,7 +121,7 @@ const deleteFile = async (accessToken, fileId) => {
 		});
 		return flag;
 	} catch (err) {
-		return "ERROR";
+		throw newError("deleteFile");
 	}
 };
 
@@ -137,7 +145,7 @@ const uploadFolder = async (accessToken, foldername, rootId = null) => {
 		var id = response.json.id;
 		return id;
 	} catch (err) {
-		return "ERROR";
+		throw newError("uploadFolder");
 	}
 };
 
@@ -156,7 +164,7 @@ const getFilesList = async (accessToken, vault) => {
 		});
 		return response.json.files;
 	} catch (err) {
-		return "ERROR";
+		throw newError("getFilesList");
 	}
 };
 
@@ -173,7 +181,7 @@ const getFoldersList = async (accessToken, vault = null) => {
 		});
 		return response.json.files;
 	} catch (err) {
-		return "ERROR";
+		throw newError("getFoldersList");
 	}
 };
 const getFile = async (accessToken, fileId) => {
@@ -199,7 +207,7 @@ const getFile = async (accessToken, fileId) => {
 		});
 		return [responseName.json.name, responseBuffer.arrayBuffer];
 	} catch (err) {
-		return "ERROR";
+		throw newError("getFile");
 	}
 };
 export {
