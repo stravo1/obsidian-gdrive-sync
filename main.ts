@@ -14,6 +14,7 @@ import axios from "axios";
 import {
 	deleteFile,
 	getFile,
+	getFileInfo,
 	getFilesList,
 	getFoldersList,
 	getVaultId,
@@ -82,6 +83,14 @@ const DEFAULT_SETTINGS: driveValues = {
 const metaPattern = /^---\n[\s\S]*---/;
 const driveDataPattern = /\nlastSync:.*\n/;
 
+interface pendingSyncItemInterface {
+	fileID?: string;
+	action: "UPLOAD" | "MODIFY" | "RENAME" | "DELETE";
+	timeStamp: string;
+	newFileName?: string;
+	isBinaryFile?: boolean;
+}
+
 export default class driveSyncPlugin extends Plugin {
 	settings: driveValues;
 	cloudFiles: string[] = [];
@@ -96,8 +105,99 @@ export default class driveSyncPlugin extends Plugin {
 	statusBarItem = this.addStatusBarItem().createEl("span", "sync_icon_still");
 	pendingSync: boolean = false;
 	connectedToInternet: boolean = true;
+	pendingSyncItems: Array<pendingSyncItemInterface> = [];
 
 	completeAllPendingSyncs = async () => {
+		let pendingSyncFile =
+			this.app.vault.getAbstractFileByPath("pendingSync");
+
+		let pendingSyncsFromFile: Array<pendingSyncItemInterface> =
+			pendingSyncFile instanceof TFile
+				? JSON.parse(await this.app.vault.read(pendingSyncFile))
+				: {};
+		this.pendingSyncItems = [...pendingSyncsFromFile];
+		new Notice(
+			"ATTENTION: Syncing all pending changes since app was last online!"
+		);
+		new Notice(
+			"Please wait till the sync is complete before proceeding with anything else..."
+		);
+
+		for (var item of pendingSyncsFromFile) {
+			switch (item.action) {
+				case "DELETE":
+					var res = await getFileInfo(
+						this.settings.accessToken,
+						item.fileID
+					);
+					var lastCloudUpdateTime = new Date(res.json.modifiedTime);
+					var pendingSyncTime = new Date(item.timeStamp);
+					if (pendingSyncTime > lastCloudUpdateTime) {
+						await deleteFile(
+							this.settings.accessToken,
+							item.fileID
+						);
+					}
+					break;
+				case "UPLOAD":
+					var file = this.app.vault.getAbstractFileByPath(
+						item.newFileName ? item.newFileName : "n/a"
+					);
+					if (file instanceof TFile) {
+						if (item.isBinaryFile) {
+							await this.uploadNewAttachment(file);
+						} else {
+							await this.uploadNewNotesFile(file);
+						}
+					}
+					break;
+				case "MODIFY":
+					var res = await getFileInfo(
+						this.settings.accessToken,
+						item.fileID
+					);
+					var lastCloudUpdateTime = new Date(res.json.modifiedTime);
+					var pendingSyncTime = new Date(item.timeStamp);
+					if (pendingSyncTime > lastCloudUpdateTime) {
+						let file = this.app.vault.getAbstractFileByPath(
+							res.json.name
+						);
+						if (file instanceof TFile) {
+							await this.updateLastSyncMetaTag(file);
+							var buffer = await this.app.vault.readBinary(file);
+							await modifyFile(
+								this.settings.accessToken,
+								item.fileID,
+								buffer
+							);
+						}
+					}
+					break;
+				case "RENAME":
+					var res = await getFileInfo(
+						this.settings.accessToken,
+						item.fileID
+					);
+					var lastCloudUpdateTime = new Date(res.json.modifiedTime);
+					var pendingSyncTime = new Date(item.timeStamp);
+					if (pendingSyncTime > lastCloudUpdateTime) {
+						await renameFile(
+							this.settings.accessToken,
+							item.fileID,
+							item.newFileName
+						);
+					}
+					break;
+			}
+			this.pendingSyncItems.shift();
+			await this.writeToPendingSyncFile();
+			new Notice(
+				`Synced ${pendingSyncsFromFile.indexOf(item) + 1}/${
+					pendingSyncsFromFile.length
+				} changes`
+			);
+		}
+		new Notice("Sync complete!");
 		this.pendingSync = false;
 	};
 
@@ -106,7 +206,6 @@ export default class driveSyncPlugin extends Plugin {
 			await fetch("https://www.github.com/stravo1", {
 				mode: "no-cors",
 			});
-			console.log(109);
 
 			if (!this.connectedToInternet) {
 				new Notice("Connectivity re-established!");
@@ -176,12 +275,10 @@ export default class driveSyncPlugin extends Plugin {
 				return;
 			}
 			if (this.alreadyRefreshing) {
-				console.log(109);
 				return;
 			} else {
 				this.alreadyRefreshing = true;
 			}
-			console.log(108);
 			this.settings.filesList = await getFilesList(
 				// refresh fileslist
 				// get list of files in the vault
@@ -406,6 +503,86 @@ export default class driveSyncPlugin extends Plugin {
 		}
 	};
 
+	uploadNewAttachment = async (e: TFile) => {
+		new Notice("Uploading new attachment!");
+		var buffer: any = await this.app.vault.readBinary(e);
+		const fileExtensionPattern = /\..*/;
+		var newFileName = e.path.replace(
+			fileExtensionPattern,
+			"-synced" + e.path.match(fileExtensionPattern)![0]
+		);
+
+		this.currentlyUploading = newFileName;
+
+		await this.app.vault.rename(e, newFileName);
+
+		this.cloudFiles.push(newFileName);
+		await uploadFile(
+			this.settings.accessToken,
+			newFileName,
+			buffer,
+			this.settings.vaultId
+		);
+
+		this.currentlyUploading = null;
+		new Notice("Uploaded!");
+		new Notice(
+			"Please make sure that all links to this attachment are updated with the new name: " +
+				newFileName.match(/\/.*-synced\..*$/)![0].slice(1),
+			5000
+		);
+	};
+
+	updateLastSyncMetaTag = async (e: TFile) => {
+		var content = await this.app.vault.read(e);
+
+		var metaExists = metaPattern.test(content);
+		var driveDataExists = driveDataPattern.test(content);
+
+		if (metaExists) {
+			if (driveDataExists) {
+				this.app.vault.modify(
+					e,
+					content.replace(
+						driveDataPattern,
+						`\nlastSync: ${new Date().toString()}\n`
+					)
+				);
+			} else {
+				this.app.vault.modify(
+					e,
+					content.replace(
+						/^---\n/g,
+						`---\nlastSync: ${new Date().toString()}\n`
+					)
+				);
+			}
+		} else {
+			this.app.vault.modify(
+				e,
+				`---\nlastSync: ${new Date().toString()}\n---\n` + content
+			);
+		}
+	};
+
+	writeToPendingSyncFile = async () => {
+		let pendingSyncFile =
+			this.app.vault.getAbstractFileByPath("pendingSync");
+		//console.log(JSON.stringify(this.pendingSyncItems));
+
+		if (pendingSyncFile instanceof TFile) {
+			await this.app.vault.modify(
+				pendingSyncFile,
+				JSON.stringify(this.pendingSyncItems)
+			);
+		} else {
+			await this.app.vault.create(
+				"pendingSync",
+				JSON.stringify(this.pendingSyncItems)
+			);
+		}
+	};
+
 	async onload() {
 		await this.loadSettings();
 
@@ -510,11 +687,44 @@ export default class driveSyncPlugin extends Plugin {
 
 		this.registerEvent(
 			this.app.vault.on("rename", async (newFile, oldpath) => {
+				if (newFile.path == "pendingSync") {
+					return;
+				}
 				try {
 					if (!this.connectedToInternet) {
 						console.log(
 							"ERROR: Connectivity lost, not renaming files to Google Drive..."
 						);
+						if (!this.cloudFiles.length) {
+							console.log(
+								"FATAL ERROR: Nothing in cloudFiles...."
+							);
+							return;
+						}
+						if (!this.cloudFiles.includes(oldpath)) {
+							if (newFile instanceof TFile) {
+								this.pendingSyncItems.push({
+									newFileName: newFile.path,
+									action: "UPLOAD",
+									timeStamp: new Date().toString(),
+								});
+							}
+						} else {
+							let id;
+							this.settings.filesList.map((file, index) => {
+								if (file.name == oldpath) {
+									id = file.id;
+								}
+							});
+							this.pendingSyncItems.push({
+								fileID: id,
+								action: "RENAME",
+								timeStamp: new Date().toString(),
+								newFileName: newFile.path,
+							});
+						}
+						await this.writeToPendingSyncFile();
+						return;
 					}
 					/* this is for newly created files
 					as the newly created file is always renamed first
@@ -567,46 +777,31 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.vault.on("create", async (e) => {
+				if (e.path == "pendingSync") {
+					return;
+				}
 				try {
 					if (!this.connectedToInternet) {
 						console.log(
 							"ERROR: Connectivity lost, not uploading files to Google Drive..."
 						);
+						if (e instanceof TFile && !/-synced\.*/.test(e.path)) {
+							if (e.extension != "md") {
+								this.pendingSyncItems.push({
+									action: "UPLOAD",
+									timeStamp: new Date().toString(),
+									newFileName: e.path,
+									isBinaryFile: true,
+								});
+							}
+						}
+						await this.writeToPendingSyncFile();
+						return;
 					}
+
 					if (e instanceof TFile && !/-synced\.*/.test(e.path)) {
 						if (e.extension != "md") {
-							new Notice("Uploading new attachment!");
-							var buffer: any = await this.app.vault.readBinary(
-								e
-							);
-							const fileExtensionPattern = /\..*/;
-							var newFileName = e.path.replace(
-								fileExtensionPattern,
-								"-synced" +
-									e.path.match(fileExtensionPattern)![0]
-							);
-
-							this.currentlyUploading = newFileName;
-
-							await this.app.vault.rename(e, newFileName);
-
-							this.cloudFiles.push(newFileName);
-							await uploadFile(
-								this.settings.accessToken,
-								newFileName,
-								buffer,
-								this.settings.vaultId
-							);
-
-							this.currentlyUploading = null;
-							new Notice("Uploaded!");
-							new Notice(
-								"Please make sure that all links to this attachment are updated with the new name: " +
-									newFileName
-										.match(/\/.*-synced\..*$/)![0]
-										.slice(1),
-								5000
-							);
+							await this.uploadNewAttachment(e);
 							this.settings.filesList = await getFilesList(
 								this.settings.accessToken,
 								this.settings.vaultId
@@ -622,11 +817,27 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.vault.on("delete", async (e) => {
+				if (e.path == "pendingSync") {
+					return;
+				}
 				try {
 					if (!this.connectedToInternet) {
 						console.log(
 							"ERROR: Connectivity lost, not deleting files from Google Drive..."
 						);
+						let id;
+						this.settings.filesList.map((file, index) => {
+							if (file.name == e.path) {
+								id = file.id;
+							}
+						});
+						this.pendingSyncItems.push({
+							fileID: id,
+							action: "DELETE",
+							timeStamp: new Date().toString(),
+						});
+						await this.writeToPendingSyncFile();
+						return;
 					}
 					if (this.settings.refresh) return;
 					var id;
@@ -662,11 +873,65 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.vault.on("modify", async (e) => {
+				if (e.path == "pendingSync") {
+					return;
+				}
 				try {
 					if (!this.connectedToInternet) {
 						console.log(
 							"ERROR: Connectivity lost, not modifying files on Google Drive..."
 						);
+						if (!this.cloudFiles.length) {
+							console.log(
+								"FATAL ERROR: Nothing in cloudFiles...."
+							);
+							return;
+						}
+						if (!this.cloudFiles.includes(e.path)) {
+							if (e instanceof TFile) {
+								let lastItemOnPendingSync =
+									this.pendingSyncItems[
+										this.pendingSyncItems.length - 1
+									];
+								if (
+									lastItemOnPendingSync?.newFileName ==
+										e.path &&
+									lastItemOnPendingSync?.action == "UPLOAD"
+								) {
+									this.pendingSyncItems.pop();
+								}
+								this.pendingSyncItems.push({
+									newFileName: e.path,
+									action: "UPLOAD",
+									timeStamp: new Date().toString(),
+								});
+							}
+						} else {
+							let id;
+							this.settings.filesList.map((file, index) => {
+								if (file.name == e.path) {
+									id = file.id;
+								}
+							});
+							let lastItemOnPendingSync =
+								this.pendingSyncItems[
+									this.pendingSyncItems.length - 1
+								];
+							if (
+								lastItemOnPendingSync?.fileID == id &&
+								lastItemOnPendingSync?.action == "MODIFY"
+							) {
+								this.pendingSyncItems.pop();
+							}
+
+							this.pendingSyncItems.push({
+								fileID: id,
+								action: "MODIFY",
+								timeStamp: new Date().toString(),
+							});
+						}
+						await this.writeToPendingSyncFile();
+						return;
 					}
 					if (!this.cloudFiles.includes(e.path)) {
 						if (e instanceof TFile) {
@@ -694,38 +959,10 @@ export default class driveSyncPlugin extends Plugin {
 						);
 						setIcon(this.statusBarItem, "sync");
 
-						var content = await this.app.vault.read(e);
-
-						var metaExists = metaPattern.test(content);
-						var driveDataExists = driveDataPattern.test(content);
-
 						this.writingFile = true;
 
-						if (metaExists) {
-							if (driveDataExists) {
-								this.app.vault.modify(
-									e,
-									content.replace(
-										driveDataPattern,
-										`\nlastSync: ${new Date().toString()}\n`
-									)
-								);
-							} else {
-								this.app.vault.modify(
-									e,
-									content.replace(
-										/^---\n/g,
-										`---\nlastSync: ${new Date().toString()}\n`
-									)
-								);
-							}
-						} else {
-							this.app.vault.modify(
-								e,
-								`---\nlastSync: ${new Date().toString()}\n---\n` +
-									content
-							);
-						}
+						await this.updateLastSyncMetaTag(e);
+
 						var id;
 						this.settings.filesList.map((file: any) => {
 							if (file.name == e.path) {

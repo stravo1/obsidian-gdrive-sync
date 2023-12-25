@@ -20,6 +20,7 @@ const getVaultId = async (accessToken, vault, root = null) => {
 		var vaultId = vaultFolder.length ? vaultFolder[0].id : "NOT FOUND";
 		return vaultId;
 	} catch (err) {
+		console.log(err);
 		throw newError("getVaultId");
 
 	}
@@ -61,6 +62,7 @@ const uploadFile = async (
 		}
 		return id;
 	} catch (err) {
+		console.log(err);
 		throw newError("uploadFile");
 
 	}
@@ -79,6 +81,7 @@ const modifyFile = async (accessToken, fileId, buffer) => {
 		}).catch((e) => console.log(e));
 		return res;
 	} catch (err) {
+		console.log(err);
 		throw newError("modifyFile");
 
 	}
@@ -100,6 +103,7 @@ const renameFile = async (accessToken, fileId, newName) => {
 		var id = response.json.id;
 		return id;
 	} catch (err) {
+		console.log(err);
 		throw newError("renameFile")
 
 	}
@@ -107,7 +111,6 @@ const renameFile = async (accessToken, fileId, newName) => {
 
 const deleteFile = async (accessToken, fileId) => {
 	try {
-		var flag = true;
 		const response = await requestUrl({
 			url: `https://www.googleapis.com/drive/v3/files/${fileId}`,
 			method: "DELETE",
@@ -115,12 +118,17 @@ const deleteFile = async (accessToken, fileId) => {
 				Authorization: `Bearer ${accessToken}`,
 				"Content-Type": "application/json",
 			},
-		}).catch((e) => {
-			console.log(e);
-			flag = false;
-		});
-		return flag;
+		})
+		if (response.status == 404) {
+			return false;
+		} else {
+			return true;
+		}
 	} catch (err) {
+		if (err.status == 404) {
+			return false
+		}
+		console.log(err);
 		throw newError("deleteFile");
 	}
 };
@@ -145,6 +153,7 @@ const uploadFolder = async (accessToken, foldername, rootId = null) => {
 		var id = response.json.id;
 		return id;
 	} catch (err) {
+		console.log(err);
 		throw newError("uploadFolder");
 	}
 };
@@ -164,6 +173,7 @@ const getFilesList = async (accessToken, vault) => {
 		});
 		return response.json.files;
 	} catch (err) {
+		console.log(err);
 		throw newError("getFilesList");
 	}
 };
@@ -181,6 +191,7 @@ const getFoldersList = async (accessToken, vault = null) => {
 		});
 		return response.json.files;
 	} catch (err) {
+		console.log(err);
 		throw newError("getFoldersList");
 	}
 };
@@ -207,9 +218,29 @@ const getFile = async (accessToken, fileId) => {
 		});
 		return [responseName.json.name, responseBuffer.arrayBuffer];
 	} catch (err) {
+		console.log(err);
 		throw newError("getFile");
 	}
 };
+
+const getFileInfo = async (accessToken, id) => {
+	try {
+		const response = await requestUrl({
+			url:
+				`https://www.googleapis.com/drive/v3/files/${id}?fields=modifiedTime%2Cname%2Cid%2CmimeType`
+			,
+			method: "GET",
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+			},
+		});
+		return response;
+	} catch (err) {
+		console.log(err);
+		throw newError("getFileInfo");
+	}
+};
+
 export {
 	getVaultId,
 	getFilesList,
@@ -220,4 +251,5 @@ export {
 	renameFile,
 	deleteFile,
 	modifyFile,
+	getFileInfo
 };
