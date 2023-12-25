@@ -116,88 +116,107 @@ export default class driveSyncPlugin extends Plugin {
 				? JSON.parse(await this.app.vault.read(pendingSyncFile))
 				: {};
 		this.pendingSyncItems = [...pendingSyncsFromFile];
-		new Notice(
-			"ATTENTION: Syncing all pending changes since app was last online!"
-		);
-		new Notice(
-			"Please wait till the sync is complete before proceeding with anything else..."
-		);
+		console.log(pendingSyncsFromFile);
 
-		for (var item of pendingSyncsFromFile) {
-			switch (item.action) {
-				case "DELETE":
-					var res = await getFileInfo(
-						this.settings.accessToken,
-						item.fileID
-					);
-					var lastCloudUpdateTime = new Date(res.json.modifiedTime);
-					var pendingSyncTime = new Date(item.timeStamp);
-					if (pendingSyncTime > lastCloudUpdateTime) {
-						await deleteFile(
+		if (pendingSyncsFromFile.length) {
+			new Notice(
+				"ATTENTION: Syncing all pending changes since app was last online!"
+			);
+			new Notice(
+				"Please wait till the sync is complete before proceeding with anything else..."
+			);
+		}
+
+		try {
+			for (var item of pendingSyncsFromFile) {
+				switch (item.action) {
+					case "DELETE":
+						var res = await getFileInfo(
 							this.settings.accessToken,
 							item.fileID
 						);
-					}
-					break;
-				case "UPLOAD":
-					var file = this.app.vault.getAbstractFileByPath(
-						item.newFileName ? item.newFileName : "n/a"
-					);
-					if (file instanceof TFile) {
-						if (item.isBinaryFile) {
-							await this.uploadNewAttachment(file);
-						} else {
-							await this.uploadNewNotesFile(file);
-						}
-					}
-					break;
-				case "MODIFY":
-					var res = await getFileInfo(
-						this.settings.accessToken,
-						item.fileID
-					);
-					var lastCloudUpdateTime = new Date(res.json.modifiedTime);
-					var pendingSyncTime = new Date(item.timeStamp);
-					if (pendingSyncTime > lastCloudUpdateTime) {
-						let file = this.app.vault.getAbstractFileByPath(
-							res.json.name
+						var lastCloudUpdateTime = new Date(
+							res.json.modifiedTime
 						);
-						if (file instanceof TFile) {
-							await this.updateLastSyncMetaTag(file);
-							var buffer = await this.app.vault.readBinary(file);
-							await modifyFile(
+						var pendingSyncTime = new Date(item.timeStamp);
+						if (pendingSyncTime > lastCloudUpdateTime) {
+							await deleteFile(
 								this.settings.accessToken,
-								item.fileID,
-								buffer
+								item.fileID
 							);
 						}
-					}
-					break;
-				case "RENAME":
-					var res = await getFileInfo(
-						this.settings.accessToken,
-						item.fileID
-					);
-					var lastCloudUpdateTime = new Date(res.json.modifiedTime);
-					var pendingSyncTime = new Date(item.timeStamp);
-					if (pendingSyncTime > lastCloudUpdateTime) {
-						await renameFile(
-							this.settings.accessToken,
-							item.fileID,
-							item.newFileName
+						break;
+					case "UPLOAD":
+						var file = this.app.vault.getAbstractFileByPath(
+							item.newFileName ? item.newFileName : "n/a"
 						);
-					}
-					break;
+						if (file instanceof TFile) {
+							if (item.isBinaryFile) {
+								await this.uploadNewAttachment(file);
+							} else {
+								await this.uploadNewNotesFile(file);
+							}
+						}
+						break;
+					case "MODIFY":
+						var res = await getFileInfo(
+							this.settings.accessToken,
+							item.fileID
+						);
+						var lastCloudUpdateTime = new Date(
+							res.json.modifiedTime
+						);
+						var pendingSyncTime = new Date(item.timeStamp);
+						if (pendingSyncTime > lastCloudUpdateTime) {
+							let file = this.app.vault.getAbstractFileByPath(
+								res.json.name
+							);
+							if (file instanceof TFile) {
+								await this.updateLastSyncMetaTag(file);
+								var buffer = await this.app.vault.readBinary(
+									file
+								);
+								await modifyFile(
+									this.settings.accessToken,
+									item.fileID,
+									buffer
+								);
+							}
+						}
+						break;
+					case "RENAME":
+						var res = await getFileInfo(
+							this.settings.accessToken,
+							item.fileID
+						);
+						var lastCloudUpdateTime = new Date(
+							res.json.modifiedTime
+						);
+						var pendingSyncTime = new Date(item.timeStamp);
+						if (pendingSyncTime > lastCloudUpdateTime) {
+							await renameFile(
+								this.settings.accessToken,
+								item.fileID,
+								item.newFileName
+							);
+						}
+						break;
+				}
+				this.pendingSyncItems.shift();
+				await this.writeToPendingSyncFile();
+				new Notice(
+					`Synced ${pendingSyncsFromFile.indexOf(item) + 1}/${
+						pendingSyncsFromFile.length
+					} changes`
+				);
 			}
-			this.pendingSyncItems.shift();
-			await this.writeToPendingSyncFile();
-			new Notice(
-				`Synced ${pendingSyncsFromFile.indexOf(item) + 1}/${
-					pendingSyncsFromFile.length
-				} changes`
-			);
+		} catch (err) {
+			this.notifyError();
+			this.checkForConnectivity();
 		}
-		new Notice("Sync complete!");
+		if (pendingSyncsFromFile.length) {
+			new Notice("Sync complete!");
+		}
 		this.pendingSync = false;
 	};
 
@@ -609,7 +628,24 @@ export default class driveSyncPlugin extends Plugin {
 				new Notice(
 					"Check your internet connection and restart the plugin..."
 				);
-				return;
+				this.connectedToInternet = false;
+
+				/* use previously fetched fileList (can't beleive this is actually becoming useful) */
+				this.settings.filesList.map((file) =>
+					this.cloudFiles.push(file.name)
+				);
+				this.app.vault
+					.getFiles()
+					.map((file) => this.localFiles.push(file.path));
+
+				let pendingSyncFile =
+					this.app.vault.getAbstractFileByPath("pendingSync");
+				var previousPendingSyncItems: Array<pendingSyncItemInterface> =
+					pendingSyncFile instanceof TFile
+						? JSON.parse(await this.app.vault.read(pendingSyncFile))
+						: {};
+				this.pendingSyncItems = [...previousPendingSyncItems];
+				break;
 			}
 		}
 
@@ -664,6 +700,7 @@ export default class driveSyncPlugin extends Plugin {
 			} else {
 				// if vault exists
 				this.settings.vaultInit = true;
+				await this.completeAllPendingSyncs();
 				this.refreshAll();
 				this.registerInterval(
 					window.setInterval(async () => {
