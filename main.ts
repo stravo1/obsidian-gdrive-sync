@@ -114,7 +114,7 @@ export default class driveSyncPlugin extends Plugin {
 		let pendingSyncsFromFile: Array<pendingSyncItemInterface> =
 			pendingSyncFile instanceof TFile
 				? JSON.parse(await this.app.vault.read(pendingSyncFile))
-				: {};
+				: [];
 		this.pendingSyncItems = [...pendingSyncsFromFile];
 		console.log(pendingSyncsFromFile);
 
