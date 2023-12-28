@@ -109,7 +109,7 @@ export default class driveSyncPlugin extends Plugin {
 
 	completeAllPendingSyncs = async () => {
 		let pendingSyncFile =
-			this.app.vault.getAbstractFileByPath("pendingSync");
+			this.app.vault.getAbstractFileByPath("pendingSync-gdrive-plugin");
 
 		let pendingSyncsFromFile: Array<pendingSyncItemInterface> =
 			pendingSyncFile instanceof TFile
@@ -586,7 +586,7 @@ export default class driveSyncPlugin extends Plugin {
 
 	writeToPendingSyncFile = async () => {
 		let pendingSyncFile =
-			this.app.vault.getAbstractFileByPath("pendingSync");
+			this.app.vault.getAbstractFileByPath("pendingSync-gdrive-plugin");
 		//console.log(JSON.stringify(this.pendingSyncItems));
 
 		if (pendingSyncFile instanceof TFile) {
@@ -596,7 +596,7 @@ export default class driveSyncPlugin extends Plugin {
 			);
 		} else {
 			await this.app.vault.create(
-				"pendingSync",
+				"pendingSync-gdrive-plugin",
 				JSON.stringify(this.pendingSyncItems)
 			);
 		}
@@ -639,7 +639,7 @@ export default class driveSyncPlugin extends Plugin {
 					.map((file) => this.localFiles.push(file.path));
 
 				let pendingSyncFile =
-					this.app.vault.getAbstractFileByPath("pendingSync");
+					this.app.vault.getAbstractFileByPath("pendingSync-gdrive-plugin");
 				var previousPendingSyncItems: Array<pendingSyncItemInterface> =
 					pendingSyncFile instanceof TFile
 						? JSON.parse(await this.app.vault.read(pendingSyncFile))
@@ -724,7 +724,7 @@ export default class driveSyncPlugin extends Plugin {
 
 		this.registerEvent(
 			this.app.vault.on("rename", async (newFile, oldpath) => {
-				if (newFile.path == "pendingSync") {
+				if (newFile.path == "pendingSync-gdrive-plugin") {
 					return;
 				}
 				try {
@@ -814,7 +814,7 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.vault.on("create", async (e) => {
-				if (e.path == "pendingSync") {
+				if (e.path == "pendingSync-gdrive-plugin") {
 					return;
 				}
 				try {
@@ -854,7 +854,7 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.vault.on("delete", async (e) => {
-				if (e.path == "pendingSync") {
+				if (e.path == "pendingSync-gdrive-plugin") {
 					return;
 				}
 				try {
@@ -910,7 +910,7 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.vault.on("modify", async (e) => {
-				if (e.path == "pendingSync") {
+				if (e.path == "pendingSync-gdrive-plugin") {
 					return;
 				}
 				try {
