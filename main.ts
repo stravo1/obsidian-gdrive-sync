@@ -10,7 +10,7 @@ import {
 } from "obsidian";
 
 import axios from "axios";
-
+import ShortUniqueId from "short-unique-id";
 import {
 	deleteFile,
 	getFile,
@@ -23,6 +23,25 @@ import {
 	uploadFile,
 	uploadFolder,
 } from "./actions";
+
+/* helper functions */
+function objectToMap(obj: Record<string, string>) {
+	const map: Map<string, string> = new Map();
+	for (const key in obj) {
+		if (obj.hasOwnProperty(key)) {
+			map.set(key, obj[key]);
+		}
+	}
+	return map;
+}
+
+function mapToObject(map: Map<string, string>) {
+	let obj: Record<string, string> = {};
+	for (const [key, value] of map.entries()) {
+		obj[key] = value;
+	}
+	return obj;
+}
 
 const getAccessToken = async (
 	refreshToken: string,
@@ -49,6 +68,8 @@ const getAccessToken = async (
 		});
 	return response;
 };
+
+const { randomUUID } = new ShortUniqueId({ length: 6 });
 
 interface driveValues {
 	refreshToken: string;
@@ -106,19 +127,45 @@ export default class driveSyncPlugin extends Plugin {
 	pendingSync: boolean = false;
 	connectedToInternet: boolean = true;
 	pendingSyncItems: Array<pendingSyncItemInterface> = [];
+	renamedWhileOffline: Map<string, string> = new Map();
+	finalNamesForFileID: Map<string, string> = new Map();
+	completingPendingSync: boolean = false;
 
 	completeAllPendingSyncs = async () => {
-		let pendingSyncFile =
-			this.app.vault.getAbstractFileByPath("pendingSync-gdrive-plugin");
+		/* files created when offline are assigned a dummy fileId 
+		so the following Map keeps track of the dummy fielId to the actual fileId 
+		which is retrieved when the file is uploadedf for the first time when online */
+		let uuidToFileIdMap = new Map();
 
-		let pendingSyncsFromFile: Array<pendingSyncItemInterface> =
+		let pendingSyncFile = this.app.vault.getAbstractFileByPath(
+			"pendingSync-gdrive-plugin"
+		);
+
+		pendingSyncFile instanceof TFile
+			? console.log(
+					JSON.parse(await this.app.vault.read(pendingSyncFile))
+			  )
+			: console.log("No file");
+
+		let {
+			pendingSyncItems,
+			finalNamesForFileID,
+		}: {
+			pendingSyncItems: Array<pendingSyncItemInterface>;
+			finalNamesForFileID: Record<string, string>;
+		} =
 			pendingSyncFile instanceof TFile
 				? JSON.parse(await this.app.vault.read(pendingSyncFile))
-				: [];
-		this.pendingSyncItems = [...pendingSyncsFromFile];
-		console.log(pendingSyncsFromFile);
+				: { pendingSyncItems: [], finalNamesForFileID: new Map() };
 
-		if (pendingSyncsFromFile.length) {
+		this.pendingSyncItems = [...pendingSyncItems];
+		this.finalNamesForFileID = objectToMap(finalNamesForFileID);
+
+		let finalNamesForFileIDMap = objectToMap(finalNamesForFileID);
+
+		console.log(pendingSyncItems, finalNamesForFileID);
+
+		if (pendingSyncItems.length) {
 			new Notice(
 				"ATTENTION: Syncing all pending changes since app was last online!"
 			);
@@ -126,50 +173,52 @@ export default class driveSyncPlugin extends Plugin {
 				"Please wait till the sync is complete before proceeding with anything else..."
 			);
 		}
-
+		this.settings.filesList = await getFilesList(
+			this.settings.accessToken,
+			this.settings.vaultId
+		); // to get the lastest modifiedTimes
 		try {
-			for (var item of pendingSyncsFromFile) {
+			this.completingPendingSync = true;
+			for (var item of pendingSyncItems) {
+				let lastCloudUpdateTime = new Date(0);
+				let pendingSyncTime = new Date(item.timeStamp);
+				this.settings.filesList.forEach((file) => {
+					if (file.id == item.fileID) {
+						lastCloudUpdateTime = new Date(file.modifiedTime!);
+					}
+				});
 				switch (item.action) {
 					case "DELETE":
-						var res = await getFileInfo(
-							this.settings.accessToken,
-							item.fileID
-						);
-						var lastCloudUpdateTime = new Date(
-							res.json.modifiedTime
-						);
-						var pendingSyncTime = new Date(item.timeStamp);
-						if (pendingSyncTime > lastCloudUpdateTime) {
+						if (lastCloudUpdateTime < pendingSyncTime) {
 							await deleteFile(
 								this.settings.accessToken,
-								item.fileID
+								uuidToFileIdMap.get(item.fileID)
+									? uuidToFileIdMap.get(item.fileID)
+									: item.fileID
 							);
 						}
 						break;
 					case "UPLOAD":
+						var fileName = finalNamesForFileIDMap.get(item.fileID!);
 						var file = this.app.vault.getAbstractFileByPath(
-							item.newFileName ? item.newFileName : "n/a"
+							fileName!
 						);
+						let actualId;
 						if (file instanceof TFile) {
 							if (item.isBinaryFile) {
-								await this.uploadNewAttachment(file);
+								actualId = await this.uploadNewAttachment(file);
 							} else {
-								await this.uploadNewNotesFile(file);
+								actualId = await this.uploadNewNotesFile(file);
 							}
 						}
+						uuidToFileIdMap.set(item.fileID, actualId);
+						finalNamesForFileIDMap.set(actualId, fileName!);
+						this.finalNamesForFileID.set(actualId, fileName!);
 						break;
 					case "MODIFY":
-						var res = await getFileInfo(
-							this.settings.accessToken,
-							item.fileID
-						);
-						var lastCloudUpdateTime = new Date(
-							res.json.modifiedTime
-						);
-						var pendingSyncTime = new Date(item.timeStamp);
 						if (pendingSyncTime > lastCloudUpdateTime) {
 							let file = this.app.vault.getAbstractFileByPath(
-								res.json.name
+								finalNamesForFileIDMap.get(item.fileID!)!
 							);
 							if (file instanceof TFile) {
 								await this.updateLastSyncMetaTag(file);
@@ -178,26 +227,22 @@ export default class driveSyncPlugin extends Plugin {
 								);
 								await modifyFile(
 									this.settings.accessToken,
-									item.fileID,
+									uuidToFileIdMap.get(item.fileID)
+										? uuidToFileIdMap.get(item.fileID)
+										: item.fileID,
 									buffer
 								);
 							}
 						}
 						break;
 					case "RENAME":
-						var res = await getFileInfo(
-							this.settings.accessToken,
-							item.fileID
-						);
-						var lastCloudUpdateTime = new Date(
-							res.json.modifiedTime
-						);
-						var pendingSyncTime = new Date(item.timeStamp);
 						if (pendingSyncTime > lastCloudUpdateTime) {
 							await renameFile(
 								this.settings.accessToken,
-								item.fileID,
-								item.newFileName
+								uuidToFileIdMap.get(item.fileID)
+									? uuidToFileIdMap.get(item.fileID)
+									: item.fileID,
+								finalNamesForFileIDMap.get(item.fileID!)
 							);
 						}
 						break;
@@ -205,19 +250,24 @@ export default class driveSyncPlugin extends Plugin {
 				this.pendingSyncItems.shift();
 				await this.writeToPendingSyncFile();
 				new Notice(
-					`Synced ${pendingSyncsFromFile.indexOf(item) + 1}/${
-						pendingSyncsFromFile.length
+					`Synced ${pendingSyncItems.indexOf(item) + 1}/${
+						pendingSyncItems.length
 					} changes`
 				);
 			}
 		} catch (err) {
+			this.completingPendingSync = false;
 			this.notifyError();
 			this.checkForConnectivity();
 		}
-		if (pendingSyncsFromFile.length) {
+		if (pendingSyncItems.length) {
 			new Notice("Sync complete!");
+			this.finalNamesForFileID.clear();
+			await this.writeToPendingSyncFile();
 		}
+		this.completingPendingSync = false;
 		this.pendingSync = false;
+		this.refreshAll();
 	};
 
 	checkForConnectivity = async () => {
@@ -430,7 +480,7 @@ export default class driveSyncPlugin extends Plugin {
 			}
 
 			var buffer: any = await this.app.vault.readBinary(newFile);
-			var res = uploadFile(
+			var id = await uploadFile(
 				this.settings.accessToken,
 				newFile.path,
 				buffer,
@@ -446,6 +496,7 @@ export default class driveSyncPlugin extends Plugin {
 			this.currentlyUploading = null;
 
 			new Notice("Uploaded!");
+			return id;
 		} catch (err) {
 			this.notifyError();
 			this.checkForConnectivity();
@@ -536,7 +587,7 @@ export default class driveSyncPlugin extends Plugin {
 		await this.app.vault.rename(e, newFileName);
 
 		this.cloudFiles.push(newFileName);
-		await uploadFile(
+		let id = await uploadFile(
 			this.settings.accessToken,
 			newFileName,
 			buffer,
@@ -550,6 +601,7 @@ export default class driveSyncPlugin extends Plugin {
 				newFileName.match(/\/.*-synced\..*$/)![0].slice(1),
 			5000
 		);
+		return id;
 	};
 
 	updateLastSyncMetaTag = async (e: TFile) => {
@@ -585,19 +637,33 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	writeToPendingSyncFile = async () => {
-		let pendingSyncFile =
-			this.app.vault.getAbstractFileByPath("pendingSync-gdrive-plugin");
-		//console.log(JSON.stringify(this.pendingSyncItems));
+		let pendingSyncFile = this.app.vault.getAbstractFileByPath(
+			"pendingSync-gdrive-plugin"
+		);
+		// console.log(
+		// 	this.pendingSyncItems,
+		// 	this.finalNamesForFileID,
+		// 	JSON.stringify({
+		// 		pendingSyncItems: this.pendingSyncItems,
+		// 		finalNamesForFileID: mapToObject(this.finalNamesForFileID),
+		// 	})
+		// );
 
 		if (pendingSyncFile instanceof TFile) {
 			await this.app.vault.modify(
 				pendingSyncFile,
-				JSON.stringify(this.pendingSyncItems)
+				JSON.stringify({
+					pendingSyncItems: this.pendingSyncItems,
+					finalNamesForFileID: mapToObject(this.finalNamesForFileID),
+				})
 			);
 		} else {
 			await this.app.vault.create(
 				"pendingSync-gdrive-plugin",
-				JSON.stringify(this.pendingSyncItems)
+				JSON.stringify({
+					pendingSyncItems: this.pendingSyncItems,
+					finalNamesForFileID: mapToObject(this.finalNamesForFileID),
+				})
 			);
 		}
 	};
@@ -638,8 +704,9 @@ export default class driveSyncPlugin extends Plugin {
 					.getFiles()
 					.map((file) => this.localFiles.push(file.path));
 
-				let pendingSyncFile =
-					this.app.vault.getAbstractFileByPath("pendingSync-gdrive-plugin");
+				let pendingSyncFile = this.app.vault.getAbstractFileByPath(
+					"pendingSync-gdrive-plugin"
+				);
 				var previousPendingSyncItems: Array<pendingSyncItemInterface> =
 					pendingSyncFile instanceof TFile
 						? JSON.parse(await this.app.vault.read(pendingSyncFile))
@@ -727,6 +794,9 @@ export default class driveSyncPlugin extends Plugin {
 				if (newFile.path == "pendingSync-gdrive-plugin") {
 					return;
 				}
+				if (this.completingPendingSync) {
+					return;
+				}
 				try {
 					if (!this.connectedToInternet) {
 						console.log(
@@ -738,27 +808,42 @@ export default class driveSyncPlugin extends Plugin {
 							);
 							return;
 						}
-						if (!this.cloudFiles.includes(oldpath)) {
+						if (
+							!this.cloudFiles.includes(oldpath) &&
+							!this.renamedWhileOffline.get(oldpath)
+						) {
 							if (newFile instanceof TFile) {
+								let id = randomUUID();
 								this.pendingSyncItems.push({
 									newFileName: newFile.path,
 									action: "UPLOAD",
+									fileID: id,
 									timeStamp: new Date().toString(),
 								});
+								this.renamedWhileOffline.set(newFile.path, id);
+								this.finalNamesForFileID.set(id, newFile.path);
 							}
 						} else {
+							let idIfWasAlreadyRenamedOffline =
+								this.renamedWhileOffline.get(oldpath);
 							let id;
-							this.settings.filesList.map((file, index) => {
-								if (file.name == oldpath) {
-									id = file.id;
-								}
-							});
+							if (idIfWasAlreadyRenamedOffline) {
+								id = idIfWasAlreadyRenamedOffline;
+							} else {// this should change to proper id, if not then error
+								this.settings.filesList.map((file, index) => {
+									if (file.name == oldpath) {
+										id = file.id;
+									}
+								});
+							}
 							this.pendingSyncItems.push({
 								fileID: id,
 								action: "RENAME",
 								timeStamp: new Date().toString(),
-								newFileName: newFile.path,
 							});
+							this.renamedWhileOffline.set(newFile.path, id!);
+							this.renamedWhileOffline.delete(oldpath);
+							this.finalNamesForFileID.set(id!, newFile.path);
 						}
 						await this.writeToPendingSyncFile();
 						return;
@@ -817,6 +902,9 @@ export default class driveSyncPlugin extends Plugin {
 				if (e.path == "pendingSync-gdrive-plugin") {
 					return;
 				}
+				if (this.completingPendingSync) {
+					return;
+				}
 				try {
 					if (!this.connectedToInternet) {
 						console.log(
@@ -824,12 +912,16 @@ export default class driveSyncPlugin extends Plugin {
 						);
 						if (e instanceof TFile && !/-synced\.*/.test(e.path)) {
 							if (e.extension != "md") {
+								let id = randomUUID();
 								this.pendingSyncItems.push({
 									action: "UPLOAD",
 									timeStamp: new Date().toString(),
 									newFileName: e.path,
 									isBinaryFile: true,
+									fileID: id,
 								});
+								this.renamedWhileOffline.set(e.path, id);
+								this.finalNamesForFileID.set(id, e.path);
 							}
 						}
 						await this.writeToPendingSyncFile();
@@ -857,6 +949,10 @@ export default class driveSyncPlugin extends Plugin {
 				if (e.path == "pendingSync-gdrive-plugin") {
 					return;
 				}
+				if (this.completingPendingSync) {
+					return;
+				}
+
 				try {
 					if (!this.connectedToInternet) {
 						console.log(
@@ -873,6 +969,8 @@ export default class driveSyncPlugin extends Plugin {
 							action: "DELETE",
 							timeStamp: new Date().toString(),
 						});
+						this.renamedWhileOffline.delete(e.path);
+						if (id) this.finalNamesForFileID.delete(id);
 						await this.writeToPendingSyncFile();
 						return;
 					}
@@ -913,6 +1011,9 @@ export default class driveSyncPlugin extends Plugin {
 				if (e.path == "pendingSync-gdrive-plugin") {
 					return;
 				}
+				if (this.completingPendingSync) {
+					return;
+				}
 				try {
 					if (!this.connectedToInternet) {
 						console.log(
@@ -924,32 +1025,32 @@ export default class driveSyncPlugin extends Plugin {
 							);
 							return;
 						}
-						if (!this.cloudFiles.includes(e.path)) {
+						if (
+							!this.cloudFiles.includes(e.path) &&
+							!this.renamedWhileOffline.get(e.path)
+						) {
 							if (e instanceof TFile) {
-								let lastItemOnPendingSync =
-									this.pendingSyncItems[
-										this.pendingSyncItems.length - 1
-									];
-								if (
-									lastItemOnPendingSync?.newFileName ==
-										e.path &&
-									lastItemOnPendingSync?.action == "UPLOAD"
-								) {
-									this.pendingSyncItems.pop();
-								}
+								let id = randomUUID();
 								this.pendingSyncItems.push({
 									newFileName: e.path,
 									action: "UPLOAD",
 									timeStamp: new Date().toString(),
+									fileID: id,
 								});
+								this.renamedWhileOffline.set(e.path, id);
+								this.finalNamesForFileID.set(id, e.path);
 							}
 						} else {
 							let id;
-							this.settings.filesList.map((file, index) => {
-								if (file.name == e.path) {
-									id = file.id;
-								}
-							});
+							if (this.renamedWhileOffline.get(e.path)) {
+								id = this.renamedWhileOffline.get(e.path);
+							} else {
+								this.settings.filesList.map((file, index) => {
+									if (file.name == e.path) {
+										id = file.id;
+									}
+								});
+							}
 							let lastItemOnPendingSync =
 								this.pendingSyncItems[
 									this.pendingSyncItems.length - 1
