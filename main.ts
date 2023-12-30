@@ -176,7 +176,7 @@ export default class driveSyncPlugin extends Plugin {
 		this.settings.filesList = await getFilesList(
 			this.settings.accessToken,
 			this.settings.vaultId
-		); // to get the lastest modifiedTimes
+		); // to get the last modifiedTimes
 		try {
 			this.completingPendingSync = true;
 			for (var item of pendingSyncItems) {
@@ -348,12 +348,7 @@ export default class driveSyncPlugin extends Plugin {
 			} else {
 				this.alreadyRefreshing = true;
 			}
-			this.settings.filesList = await getFilesList(
-				// refresh fileslist
-				// get list of files in the vault
-				this.settings.accessToken,
-				this.settings.vaultId
-			);
+			this.refreshFilesListInDriveAndStoreInSettings();
 			/* refresh both the files list */
 			this.cloudFiles = [];
 			this.localFiles = [];
@@ -489,10 +484,7 @@ export default class driveSyncPlugin extends Plugin {
 
 			this.writingFile = false;
 			this.cloudFiles.push(newFile.path);
-			this.settings.filesList = await getFilesList(
-				this.settings.accessToken,
-				this.settings.vaultId
-			);
+			this.refreshFilesListInDriveAndStoreInSettings();
 			this.currentlyUploading = null;
 
 			new Notice("Uploaded!");
@@ -667,6 +659,20 @@ export default class driveSyncPlugin extends Plugin {
 			);
 		}
 	};
+	refreshFilesListInDriveAndStoreInSettings = async () => {
+		/*
+		fetches all the files that are backed-up in drive and
+		stores them in data.json file which contains all the settings,
+		this list can be used to get the last known list of files on drive
+		in case of offline operations when even the initial fetch request
+		for retreiving the files list also fails
+		*/
+		this.settings.filesList = await getFilesList(
+			this.settings.accessToken,
+			this.settings.vaultId
+		);
+		this.saveSettings();
+	};
 
 	async onload() {
 		await this.loadSettings();
@@ -826,10 +832,11 @@ export default class driveSyncPlugin extends Plugin {
 						} else {
 							let idIfWasAlreadyRenamedOffline =
 								this.renamedWhileOffline.get(oldpath);
-							let id;
+							let id: string;
 							if (idIfWasAlreadyRenamedOffline) {
 								id = idIfWasAlreadyRenamedOffline;
-							} else {// this should change to proper id, if not then error
+							} else {
+								// this should change to proper id, if not then error
 								this.settings.filesList.map((file, index) => {
 									if (file.name == oldpath) {
 										id = file.id;
@@ -837,7 +844,7 @@ export default class driveSyncPlugin extends Plugin {
 								});
 							}
 							this.pendingSyncItems.push({
-								fileID: id,
+								fileID: id!,
 								action: "RENAME",
 								timeStamp: new Date().toString(),
 							});
@@ -885,11 +892,7 @@ export default class driveSyncPlugin extends Plugin {
 						1
 					);
 
-					this.settings.filesList = await getFilesList(
-						// get list of files in the vault
-						this.settings.accessToken,
-						this.settings.vaultId
-					);
+					this.refreshFilesListInDriveAndStoreInSettings()
 				} catch (err) {
 					this.notifyError();
 					this.checkForConnectivity();
@@ -931,10 +934,6 @@ export default class driveSyncPlugin extends Plugin {
 					if (e instanceof TFile && !/-synced\.*/.test(e.path)) {
 						if (e.extension != "md") {
 							await this.uploadNewAttachment(e);
-							this.settings.filesList = await getFilesList(
-								this.settings.accessToken,
-								this.settings.vaultId
-							);
 						}
 					}
 				} catch (err) {
@@ -994,11 +993,7 @@ export default class driveSyncPlugin extends Plugin {
 						1
 					);
 
-					this.settings.filesList = await getFilesList(
-						// get list of files in the vault
-						this.settings.accessToken,
-						this.settings.vaultId
-					);
+					this.refreshFilesListInDriveAndStoreInSettings()
 				} catch (err) {
 					this.notifyError();
 					this.checkForConnectivity();
