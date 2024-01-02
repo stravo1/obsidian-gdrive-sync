@@ -680,6 +680,9 @@ export default class driveSyncPlugin extends Plugin {
 		var res: any = await getAccessToken(this.settings.refreshToken, true); // get accessToken
 		var count = 0;
 		while (res == "error") {
+			if (!this.settings.refreshToken) {
+				break;
+			}
 			console.log("Trying to get accessToken again after 5secs...");
 			let resolvePromise: Function;
 			let promise = new Promise((resolve, reject) => {
@@ -739,6 +742,7 @@ export default class driveSyncPlugin extends Plugin {
 					"obsidian"
 				);
 			}
+			this.saveSettings();
 		}
 		// else {
 		// 	// accessToken is not available
@@ -892,7 +896,7 @@ export default class driveSyncPlugin extends Plugin {
 						1
 					);
 
-					this.refreshFilesListInDriveAndStoreInSettings()
+					this.refreshFilesListInDriveAndStoreInSettings();
 				} catch (err) {
 					this.notifyError();
 					this.checkForConnectivity();
@@ -993,7 +997,7 @@ export default class driveSyncPlugin extends Plugin {
 						1
 					);
 
-					this.refreshFilesListInDriveAndStoreInSettings()
+					this.refreshFilesListInDriveAndStoreInSettings();
 				} catch (err) {
 					this.notifyError();
 					this.checkForConnectivity();
