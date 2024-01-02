@@ -1,7 +1,7 @@
 import { requestUrl } from "obsidian";
 
-const newError = (actionName) => {
-	return new Error("ERROR: Unable to complete action: " + actionName)
+const newError = (actionName, err) => {
+	return new Error(`ERROR: Unable to complete action: - ${actionName} => ${err.name} - ${err.message} - ${err.stack}`)
 }
 
 const getVaultId = async (accessToken, vault, root = null) => {
@@ -21,7 +21,7 @@ const getVaultId = async (accessToken, vault, root = null) => {
 		return vaultId;
 	} catch (err) {
 		console.log(err);
-		throw newError("getVaultId");
+		throw newError("getVaultId", err);
 
 	}
 };
@@ -63,7 +63,7 @@ const uploadFile = async (
 		return id;
 	} catch (err) {
 		console.log(err);
-		throw newError("uploadFile");
+		throw newError("uploadFile", err);
 
 	}
 };
@@ -82,7 +82,7 @@ const modifyFile = async (accessToken, fileId, buffer) => {
 		return res;
 	} catch (err) {
 		console.log(err);
-		throw newError("modifyFile");
+		throw newError("modifyFile", err);
 
 	}
 };
@@ -104,7 +104,7 @@ const renameFile = async (accessToken, fileId, newName) => {
 		return id;
 	} catch (err) {
 		console.log(err);
-		throw newError("renameFile")
+		throw newError("renameFile", err)
 
 	}
 };
@@ -129,7 +129,7 @@ const deleteFile = async (accessToken, fileId) => {
 			return false
 		}
 		console.log(err);
-		throw newError("deleteFile");
+		throw newError("deleteFile", err);
 	}
 };
 
@@ -154,7 +154,7 @@ const uploadFolder = async (accessToken, foldername, rootId = null) => {
 		return id;
 	} catch (err) {
 		console.log(err);
-		throw newError("uploadFolder");
+		throw newError("uploadFolder", err);
 	}
 };
 
@@ -174,7 +174,7 @@ const getFilesList = async (accessToken, vault) => {
 		return response.json.files;
 	} catch (err) {
 		console.log(err);
-		throw newError("getFilesList");
+		throw newError("getFilesList", err);
 	}
 };
 
@@ -192,7 +192,7 @@ const getFoldersList = async (accessToken, vault = null) => {
 		return response.json.files;
 	} catch (err) {
 		console.log(err);
-		throw newError("getFoldersList");
+		throw newError("getFoldersList", err);
 	}
 };
 const getFile = async (accessToken, fileId) => {
@@ -219,7 +219,7 @@ const getFile = async (accessToken, fileId) => {
 		return [responseName.json.name, responseBuffer.arrayBuffer];
 	} catch (err) {
 		console.log(err);
-		throw newError("getFile");
+		throw newError("getFile", err);
 	}
 };
 
@@ -237,7 +237,7 @@ const getFileInfo = async (accessToken, id) => {
 		return response;
 	} catch (err) {
 		console.log(err);
-		throw newError("getFileInfo");
+		throw newError("getFileInfo", err);
 	}
 };
 

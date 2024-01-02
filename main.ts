@@ -24,6 +24,11 @@ import {
 	uploadFolder,
 } from "./actions";
 
+const PENDING_SYNC_FILE_NAME = "pendingSync-gdrive-plugin";
+const ERROR_LOG_FILE_NAME = "error-log-gdrive-plugin.md";
+
+const ignoreFiles = [PENDING_SYNC_FILE_NAME, ERROR_LOG_FILE_NAME];
+
 /* helper functions */
 function objectToMap(obj: Record<string, string>) {
 	const map: Map<string, string> = new Map();
@@ -82,6 +87,7 @@ interface driveValues {
 	refresh: boolean;
 	refreshTime: string;
 	autoRefreshBinaryFiles: string;
+	loggingToFile: boolean;
 	//writingFile: boolean;
 	//syncQueue: boolean;
 }
@@ -97,6 +103,7 @@ const DEFAULT_SETTINGS: driveValues = {
 	refresh: false,
 	refreshTime: "5",
 	autoRefreshBinaryFiles: "0",
+	loggingToFile: false,
 	//writingFile: false,
 	//syncQueue: false,
 };
@@ -126,6 +133,7 @@ export default class driveSyncPlugin extends Plugin {
 	statusBarItem = this.addStatusBarItem().createEl("span", "sync_icon_still");
 	pendingSync: boolean = false;
 	connectedToInternet: boolean = true;
+	checkingForConnectivity: boolean = false;
 	pendingSyncItems: Array<pendingSyncItemInterface> = [];
 	renamedWhileOffline: Map<string, string> = new Map();
 	finalNamesForFileID: Map<string, string> = new Map();
@@ -138,7 +146,7 @@ export default class driveSyncPlugin extends Plugin {
 		let uuidToFileIdMap = new Map();
 
 		let pendingSyncFile = this.app.vault.getAbstractFileByPath(
-			"pendingSync-gdrive-plugin"
+			PENDING_SYNC_FILE_NAME
 		);
 
 		pendingSyncFile instanceof TFile
@@ -256,9 +264,14 @@ export default class driveSyncPlugin extends Plugin {
 				);
 			}
 		} catch (err) {
+			if (err.message.includes("404")) {
+				this.pendingSyncItems.shift();
+				await this.writeToPendingSyncFile();
+			}
 			this.completingPendingSync = false;
 			this.notifyError();
 			this.checkForConnectivity();
+			this.writeToErrorLogFile(err);
 		}
 		if (pendingSyncItems.length) {
 			new Notice("Sync complete!");
@@ -279,6 +292,7 @@ export default class driveSyncPlugin extends Plugin {
 			if (!this.connectedToInternet) {
 				new Notice("Connectivity re-established!");
 				this.connectedToInternet = true;
+				this.checkingForConnectivity = false;
 				this.completeAllPendingSyncs();
 			}
 		} catch (err) {
@@ -287,8 +301,10 @@ export default class driveSyncPlugin extends Plugin {
 				console.log("error: " + err); // (currently fetch failed)
 				new Notice("Connection lost :(");
 				this.connectedToInternet = false;
+				this.writeToErrorLogFile(err);
 			}
 			setTimeout(() => {
+				this.checkingForConnectivity = true;
 				this.checkForConnectivity();
 			}, 5000);
 		}
@@ -330,6 +346,7 @@ export default class driveSyncPlugin extends Plugin {
 		} catch (err) {
 			new Notice("ERROR: Unable to initialize Vault in Google Drive");
 			this.checkForConnectivity();
+			this.writeToErrorLogFile(err);
 		}
 	};
 
@@ -341,6 +358,11 @@ export default class driveSyncPlugin extends Plugin {
 			}
 			if (this.pendingSync) {
 				console.log("PAUSED: Writing pending syncs, not refreshing...");
+				if (!this.checkingForConnectivity) {
+					setTimeout(() => {
+						this.checkForConnectivity();
+					}, 5000);
+				}
 				return;
 			}
 			if (this.alreadyRefreshing) {
@@ -436,6 +458,7 @@ export default class driveSyncPlugin extends Plugin {
 		} catch (err) {
 			this.notifyError();
 			this.checkForConnectivity();
+			this.writeToErrorLogFile(err);
 			this.alreadyRefreshing = false;
 		}
 	};
@@ -492,6 +515,7 @@ export default class driveSyncPlugin extends Plugin {
 		} catch (err) {
 			this.notifyError();
 			this.checkForConnectivity();
+			this.writeToErrorLogFile(err);
 			this.writingFile = false;
 			this.currentlyUploading = null;
 		}
@@ -562,38 +586,45 @@ export default class driveSyncPlugin extends Plugin {
 		} catch (err) {
 			this.notifyError();
 			this.checkForConnectivity();
+			this.writeToErrorLogFile(err);
 		}
 	};
 
 	uploadNewAttachment = async (e: TFile) => {
-		new Notice("Uploading new attachment!");
-		var buffer: any = await this.app.vault.readBinary(e);
-		const fileExtensionPattern = /\..*/;
-		var newFileName = e.path.replace(
-			fileExtensionPattern,
-			"-synced" + e.path.match(fileExtensionPattern)![0]
-		);
+		try {
+			new Notice("Uploading new attachment!");
+			var buffer: any = await this.app.vault.readBinary(e);
+			const fileExtensionPattern = /\..*/;
+			var newFileName = e.path.replace(
+				fileExtensionPattern,
+				"-synced" + e.path.match(fileExtensionPattern)![0]
+			);
 
-		this.currentlyUploading = newFileName;
+			this.currentlyUploading = newFileName;
 
-		await this.app.vault.rename(e, newFileName);
+			await this.app.vault.rename(e, newFileName);
 
-		this.cloudFiles.push(newFileName);
-		let id = await uploadFile(
-			this.settings.accessToken,
-			newFileName,
-			buffer,
-			this.settings.vaultId
-		);
+			this.cloudFiles.push(newFileName);
+			let id = await uploadFile(
+				this.settings.accessToken,
+				newFileName,
+				buffer,
+				this.settings.vaultId
+			);
 
-		this.currentlyUploading = null;
-		new Notice("Uploaded!");
-		new Notice(
-			"Please make sure that all links to this attachment are updated with the new name: " +
-				newFileName.match(/\/.*-synced\..*$/)![0].slice(1),
-			5000
-		);
-		return id;
+			this.currentlyUploading = null;
+			new Notice("Uploaded!");
+			new Notice(
+				"Please make sure that all links to this attachment are updated with the new name: " +
+					newFileName.match(/\/.*-synced\..*$/)![0].slice(1),
+				5000
+			);
+			return id;
+		} catch (err) {
+			this.notifyError();
+			this.checkForConnectivity();
+			this.writeToErrorLogFile(err);
+		}
 	};
 
 	updateLastSyncMetaTag = async (e: TFile) => {
@@ -630,7 +661,7 @@ export default class driveSyncPlugin extends Plugin {
 
 	writeToPendingSyncFile = async () => {
 		let pendingSyncFile = this.app.vault.getAbstractFileByPath(
-			"pendingSync-gdrive-plugin"
+			PENDING_SYNC_FILE_NAME
 		);
 		// console.log(
 		// 	this.pendingSyncItems,
@@ -651,7 +682,7 @@ export default class driveSyncPlugin extends Plugin {
 			);
 		} else {
 			await this.app.vault.create(
-				"pendingSync-gdrive-plugin",
+				PENDING_SYNC_FILE_NAME,
 				JSON.stringify({
 					pendingSyncItems: this.pendingSyncItems,
 					finalNamesForFileID: mapToObject(this.finalNamesForFileID),
@@ -667,11 +698,45 @@ export default class driveSyncPlugin extends Plugin {
 		in case of offline operations when even the initial fetch request
 		for retreiving the files list also fails
 		*/
-		this.settings.filesList = await getFilesList(
-			this.settings.accessToken,
-			this.settings.vaultId
-		);
+		try {
+			this.settings.filesList = await getFilesList(
+				this.settings.accessToken,
+				this.settings.vaultId
+			);
+		} catch (err) {
+			this.notifyError();
+			this.checkForConnectivity();
+			this.writeToErrorLogFile(err);
+		}
 		this.saveSettings();
+	};
+
+	writeToErrorLogFile = async (log: Error) => {
+		if (!this.settings.loggingToFile) {
+			return;
+		}
+		let errorLogFile =
+			this.app.vault.getAbstractFileByPath(ERROR_LOG_FILE_NAME);
+		console.log(log.stack, "logging");
+
+		let content: string;
+
+		if (errorLogFile instanceof TFile) {
+			content = await this.app.vault.read(errorLogFile);
+			await this.app.vault.modify(
+				errorLogFile,
+				`${content}\n\n${new Date().toString()}-${log.name}-${
+					log.message
+				}-${log.stack}`
+			);
+		} else {
+			await this.app.vault.create(
+				ERROR_LOG_FILE_NAME,
+				`${new Date().toString()}-${log.name}-${log.message}-${
+					log.stack
+				}`
+			);
+		}
 	};
 
 	async onload() {
@@ -714,7 +779,7 @@ export default class driveSyncPlugin extends Plugin {
 					.map((file) => this.localFiles.push(file.path));
 
 				let pendingSyncFile = this.app.vault.getAbstractFileByPath(
-					"pendingSync-gdrive-plugin"
+					PENDING_SYNC_FILE_NAME
 				);
 
 				let {
@@ -770,6 +835,7 @@ export default class driveSyncPlugin extends Plugin {
 					this.settings.rootFolderId
 				);
 			} catch (err) {
+				this.writeToErrorLogFile(err);
 				new Notice(
 					"FATAL ERROR: Couldn't get VaultID from Google Drive :("
 				);
@@ -813,7 +879,7 @@ export default class driveSyncPlugin extends Plugin {
 
 		this.registerEvent(
 			this.app.vault.on("rename", async (newFile, oldpath) => {
-				if (newFile.path == "pendingSync-gdrive-plugin") {
+				if (ignoreFiles.includes(newFile.path)) {
 					return;
 				}
 				if (this.completingPendingSync) {
@@ -912,13 +978,14 @@ export default class driveSyncPlugin extends Plugin {
 				} catch (err) {
 					this.notifyError();
 					this.checkForConnectivity();
+					this.writeToErrorLogFile(err);
 					this.renamingList = [];
 				}
 			})
 		);
 		this.registerEvent(
 			this.app.vault.on("create", async (e) => {
-				if (e.path == "pendingSync-gdrive-plugin") {
+				if (ignoreFiles.includes(e.path)) {
 					return;
 				}
 				if (this.completingPendingSync) {
@@ -955,13 +1022,14 @@ export default class driveSyncPlugin extends Plugin {
 				} catch (err) {
 					this.notifyError();
 					this.checkForConnectivity();
+					this.writeToErrorLogFile(err);
 					this.currentlyUploading = null;
 				}
 			})
 		);
 		this.registerEvent(
 			this.app.vault.on("delete", async (e) => {
-				if (e.path == "pendingSync-gdrive-plugin") {
+				if (ignoreFiles.includes(e.path)) {
 					return;
 				}
 				if (this.completingPendingSync) {
@@ -1013,13 +1081,14 @@ export default class driveSyncPlugin extends Plugin {
 				} catch (err) {
 					this.notifyError();
 					this.checkForConnectivity();
+					this.writeToErrorLogFile(err);
 					this.deletingList = [];
 				}
 			})
 		);
 		this.registerEvent(
 			this.app.vault.on("modify", async (e) => {
-				if (e.path == "pendingSync-gdrive-plugin") {
+				if (ignoreFiles.includes(e.path)) {
 					return;
 				}
 				if (this.completingPendingSync) {
@@ -1140,6 +1209,7 @@ export default class driveSyncPlugin extends Plugin {
 				} catch (err) {
 					this.notifyError();
 					this.checkForConnectivity();
+					this.writeToErrorLogFile(err);
 					this.syncQueue = false;
 					this.writingFile = false;
 					this.timer = null;
@@ -1196,6 +1266,7 @@ export default class driveSyncPlugin extends Plugin {
 				} catch (err) {
 					this.notifyError();
 					this.checkForConnectivity();
+					this.writeToErrorLogFile(err);
 				}
 			}
 		);
@@ -1268,6 +1339,7 @@ export default class driveSyncPlugin extends Plugin {
 				} catch (err) {
 					this.notifyError();
 					this.checkForConnectivity();
+					this.writeToErrorLogFile(err);
 				}
 			},
 		});
@@ -1353,6 +1425,16 @@ class syncSettings extends PluginSettingTab {
 				"https://red-formula-303406.ue.r.appspot.com/auth/obsidian";
 		}
 
+		new Setting(containerEl)
+			.setName("Enable logging")
+			.setDesc("Error logs will appear in a .md file")
+			.addToggle((toggle) => {
+				toggle.setValue(this.plugin.settings.loggingToFile);
+				toggle.onChange((val) => {
+					this.plugin.settings.loggingToFile = val;
+					this.plugin.saveSettings();
+				});
+			});
 		/* set refresh token input box */
 		new Setting(containerEl)
 			.setName("Set refresh token")
@@ -1406,6 +1488,7 @@ class syncSettings extends PluginSettingTab {
 						sync_link.href =
 							"https://red-formula-303406.ue.r.appspot.com/auth/obsidian";
 					}
+					this.plugin.saveSettings();
 				})
 			);
 		if (!this.plugin.settings.validToken) return; // bodge 1
@@ -1432,6 +1515,7 @@ class syncSettings extends PluginSettingTab {
 					.setValue(this.plugin.settings.refreshTime)
 					.onChange(async (value) => {
 						this.plugin.settings.refreshTime = value;
+						this.plugin.saveSettings();
 					})
 			);
 		new Setting(containerEl)
@@ -1445,6 +1529,7 @@ class syncSettings extends PluginSettingTab {
 				selector.setValue(this.plugin.settings.autoRefreshBinaryFiles);
 				selector.onChange((val) => {
 					this.plugin.settings.autoRefreshBinaryFiles = val;
+					this.plugin.saveSettings();
 				});
 			});
 		new Setting(containerEl)
