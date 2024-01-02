@@ -716,11 +716,23 @@ export default class driveSyncPlugin extends Plugin {
 				let pendingSyncFile = this.app.vault.getAbstractFileByPath(
 					"pendingSync-gdrive-plugin"
 				);
-				var previousPendingSyncItems: Array<pendingSyncItemInterface> =
+
+				let {
+					pendingSyncItems,
+					finalNamesForFileID,
+				}: {
+					pendingSyncItems: Array<pendingSyncItemInterface>;
+					finalNamesForFileID: Record<string, string>;
+				} =
 					pendingSyncFile instanceof TFile
 						? JSON.parse(await this.app.vault.read(pendingSyncFile))
-						: {};
-				this.pendingSyncItems = [...previousPendingSyncItems];
+						: {
+								pendingSyncItems: [],
+								finalNamesForFileID: new Map(),
+						  };
+
+				this.pendingSyncItems = [...pendingSyncItems];
+				this.finalNamesForFileID = objectToMap(finalNamesForFileID);
 				break;
 			}
 		}
