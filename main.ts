@@ -26,8 +26,13 @@ import {
 
 const PENDING_SYNC_FILE_NAME = "pendingSync-gdrive-plugin";
 const ERROR_LOG_FILE_NAME = "error-log-gdrive-plugin.md";
+const VERBOSE_LOG_FILE_NAME = "verbose-log-gdrive-plugin.md";
 
-const ignoreFiles = [PENDING_SYNC_FILE_NAME, ERROR_LOG_FILE_NAME];
+const ignoreFiles = [
+	PENDING_SYNC_FILE_NAME,
+	ERROR_LOG_FILE_NAME,
+	VERBOSE_LOG_FILE_NAME,
+];
 
 /* helper functions */
 function objectToMap(obj: Record<string, string>) {
@@ -87,7 +92,8 @@ interface driveValues {
 	refresh: boolean;
 	refreshTime: string;
 	autoRefreshBinaryFiles: string;
-	loggingToFile: boolean;
+	errorLoggingToFile: boolean;
+	verboseLoggingToFile: boolean;
 	//writingFile: boolean;
 	//syncQueue: boolean;
 }
@@ -103,7 +109,8 @@ const DEFAULT_SETTINGS: driveValues = {
 	refresh: false,
 	refreshTime: "5",
 	autoRefreshBinaryFiles: "0",
-	loggingToFile: false,
+	errorLoggingToFile: false,
+	verboseLoggingToFile: false,
 	//writingFile: false,
 	//syncQueue: false,
 };
@@ -138,11 +145,13 @@ export default class driveSyncPlugin extends Plugin {
 	renamedWhileOffline: Map<string, string> = new Map();
 	finalNamesForFileID: Map<string, string> = new Map();
 	completingPendingSync: boolean = false;
+	loggingForTheFirstTime: boolean = true;
 
 	completeAllPendingSyncs = async () => {
 		/* files created when offline are assigned a dummy fileId 
 		so the following Map keeps track of the dummy fielId to the actual fileId 
 		which is retrieved when the file is uploadedf for the first time when online */
+		this.writeToVerboseLogFile("LOG: Entering completeAllPendingSyncs");
 		let uuidToFileIdMap = new Map();
 
 		let pendingSyncFile = this.app.vault.getAbstractFileByPath(
@@ -181,11 +190,12 @@ export default class driveSyncPlugin extends Plugin {
 				"Please wait till the sync is complete before proceeding with anything else..."
 			);
 		}
-		this.settings.filesList = await getFilesList(
-			this.settings.accessToken,
-			this.settings.vaultId
-		); // to get the last modifiedTimes
+
 		try {
+			this.settings.filesList = await getFilesList(
+				this.settings.accessToken,
+				this.settings.vaultId
+			); // to get the last modifiedTimes
 			this.completingPendingSync = true;
 			for (var item of pendingSyncItems) {
 				let lastCloudUpdateTime = new Date(0);
@@ -262,6 +272,9 @@ export default class driveSyncPlugin extends Plugin {
 						pendingSyncItems.length
 					} changes`
 				);
+				this.writeToVerboseLogFile(
+					"LOG: completeAllPendingSyncs: Finished one operation"
+				);
 			}
 		} catch (err) {
 			if (err.message.includes("404")) {
@@ -277,14 +290,19 @@ export default class driveSyncPlugin extends Plugin {
 			new Notice("Sync complete!");
 			this.finalNamesForFileID.clear();
 			await this.writeToPendingSyncFile();
+			this.writeToVerboseLogFile(
+				"LOG: completeAllPendingSyncs: Finished allpendingSyncs"
+			);
 		}
 		this.completingPendingSync = false;
 		this.pendingSync = false;
 		this.refreshAll();
+		this.writeToVerboseLogFile("LOG: Exited completeAllPendingSyncs");
 	};
 
 	checkForConnectivity = async () => {
 		try {
+			this.writeToVerboseLogFile("LOG: Entering checkForConnectivity");
 			await fetch("https://www.github.com/stravo1", {
 				mode: "no-cors",
 			});
@@ -293,8 +311,8 @@ export default class driveSyncPlugin extends Plugin {
 				new Notice("Connectivity re-established!");
 				this.connectedToInternet = true;
 				this.checkingForConnectivity = false;
-				this.completeAllPendingSyncs();
 			}
+			this.completeAllPendingSyncs();
 		} catch (err) {
 			console.log("Checking for connectivity again after 5sec...");
 			if (this.connectedToInternet) {
@@ -308,6 +326,7 @@ export default class driveSyncPlugin extends Plugin {
 				this.checkForConnectivity();
 			}, 5000);
 		}
+		this.writeToVerboseLogFile("LOG: Exited checkForConnectivity");
 	};
 
 	notifyError = () => {
@@ -315,10 +334,12 @@ export default class driveSyncPlugin extends Plugin {
 			this.pendingSync = true;
 			new Notice("ERROR: Something went wrong! Sync is paused.");
 		}
+		this.writeToVerboseLogFile("LOG: Error occured");
 	};
 
 	cleanInstall = async () => {
 		try {
+			this.writeToVerboseLogFile("LOG: Enerting cleanInstall");
 			new Notice("Creating vault in Google Drive...");
 			var res = await uploadFolder(
 				this.settings.accessToken,
@@ -348,9 +369,11 @@ export default class driveSyncPlugin extends Plugin {
 			this.checkForConnectivity();
 			this.writeToErrorLogFile(err);
 		}
+		this.writeToVerboseLogFile("LOG: Exited cleanInstall");
 	};
 
 	refreshAll = async () => {
+		this.writeToVerboseLogFile("LOG: Entering refreshAll");
 		try {
 			if (!this.connectedToInternet) {
 				console.log("ERROR: Connectivity lost, not refreshing...");
@@ -389,6 +412,7 @@ export default class driveSyncPlugin extends Plugin {
 					!this.deletingList.includes(file) // is not currently being deleted
 			);
 
+			this.writeToVerboseLogFile("LOG: Deleting files");
 			/* delete tracked but not-in-drive-anymore files */
 			this.app.vault.getFiles().map(async (file) => {
 				if (
@@ -409,6 +433,7 @@ export default class driveSyncPlugin extends Plugin {
 				}
 			});
 
+			this.writeToVerboseLogFile("LOG: Downloading missing files");
 			/* download new files or files that were renamed */
 			if (toDownload.length) {
 				new Notice("Downloading missing files", 2500);
@@ -461,9 +486,11 @@ export default class driveSyncPlugin extends Plugin {
 			this.writeToErrorLogFile(err);
 			this.alreadyRefreshing = false;
 		}
+		this.writeToVerboseLogFile("LOG: Exited refreshAll");
 	};
 	uploadNewNotesFile = async (newFile: TFile) => {
 		try {
+			this.writeToVerboseLogFile("LOG: Entering uploadNewNotesFile");
 			if (!this.connectedToInternet) {
 				console.log("ERROR: Connectivity lost, not uploading...");
 				return;
@@ -519,6 +546,7 @@ export default class driveSyncPlugin extends Plugin {
 			this.writingFile = false;
 			this.currentlyUploading = null;
 		}
+		this.writeToVerboseLogFile("LOG: Exited uploadNewNotesFile");
 	};
 
 	getLatestContent = async (
@@ -526,6 +554,7 @@ export default class driveSyncPlugin extends Plugin {
 		forced: "forced" | false = false
 	) => {
 		try {
+			this.writeToVerboseLogFile("LOG: Entering getLatestContent");
 			if (!this.connectedToInternet) {
 				console.log(
 					"ERROR: Connectivity lost, not fetching latest content..."
@@ -588,10 +617,12 @@ export default class driveSyncPlugin extends Plugin {
 			this.checkForConnectivity();
 			this.writeToErrorLogFile(err);
 		}
+		this.writeToVerboseLogFile("LOG: Exited getLatestContent");
 	};
 
 	uploadNewAttachment = async (e: TFile) => {
 		try {
+			this.writeToVerboseLogFile("LOG: Entering uploadNewAttachment");
 			new Notice("Uploading new attachment!");
 			var buffer: any = await this.app.vault.readBinary(e);
 			const fileExtensionPattern = /\..*/;
@@ -625,9 +656,11 @@ export default class driveSyncPlugin extends Plugin {
 			this.checkForConnectivity();
 			this.writeToErrorLogFile(err);
 		}
+		this.writeToVerboseLogFile("LOG: Exited uploadNewAttachment");
 	};
 
 	updateLastSyncMetaTag = async (e: TFile) => {
+		this.writeToVerboseLogFile("LOG: Entering updateLastSyncMetaTag");
 		var content = await this.app.vault.read(e);
 
 		var metaExists = metaPattern.test(content);
@@ -657,9 +690,11 @@ export default class driveSyncPlugin extends Plugin {
 				`---\nlastSync: ${new Date().toString()}\n---\n` + content
 			);
 		}
+		this.writeToVerboseLogFile("LOG: Exited updateLastSyncMetaTag");
 	};
 
 	writeToPendingSyncFile = async () => {
+		this.writeToVerboseLogFile("LOG: Entering writeToPendingSyncFile");
 		let pendingSyncFile = this.app.vault.getAbstractFileByPath(
 			PENDING_SYNC_FILE_NAME
 		);
@@ -689,6 +724,7 @@ export default class driveSyncPlugin extends Plugin {
 				})
 			);
 		}
+		this.writeToVerboseLogFile("LOG: Exited writeToPendingSyncFile");
 	};
 	refreshFilesListInDriveAndStoreInSettings = async () => {
 		/*
@@ -698,6 +734,9 @@ export default class driveSyncPlugin extends Plugin {
 		in case of offline operations when even the initial fetch request
 		for retreiving the files list also fails
 		*/
+		this.writeToVerboseLogFile(
+			"LOG: Entering refreshFilesListInDriveAndStoreInSettings"
+		);
 		try {
 			this.settings.filesList = await getFilesList(
 				this.settings.accessToken,
@@ -709,10 +748,14 @@ export default class driveSyncPlugin extends Plugin {
 			this.writeToErrorLogFile(err);
 		}
 		this.saveSettings();
+		this.writeToVerboseLogFile(
+			"LOG: Exiting refreshFilesListInDriveAndStoreInSettings"
+		);
 	};
 
 	writeToErrorLogFile = async (log: Error) => {
-		if (!this.settings.loggingToFile) {
+		this.writeToVerboseLogFile("LOG: Entering writeToErrorLogFile");
+		if (!this.settings.errorLoggingToFile) {
 			return;
 		}
 		let errorLogFile =
@@ -737,15 +780,41 @@ export default class driveSyncPlugin extends Plugin {
 				}`
 			);
 		}
+		this.writeToVerboseLogFile("LOG: Exited writeToErrorLogFile");
+	};
+
+	writeToVerboseLogFile = async (log: string) => {
+		if (!this.settings.verboseLoggingToFile) {
+			return;
+		}
+		let errorLogFile = this.app.vault.getAbstractFileByPath(
+			VERBOSE_LOG_FILE_NAME
+		);
+		console.log(log);
+
+		let content: string;
+
+		if (errorLogFile instanceof TFile) {
+			content = !this.loggingForTheFirstTime
+				? await this.app.vault.read(errorLogFile)
+				: "";
+			await this.app.vault.modify(errorLogFile, `${content}\n\n${log}`);
+		} else {
+			await this.app.vault.create(VERBOSE_LOG_FILE_NAME, `${log}`);
+		}
+		this.loggingForTheFirstTime = false;
 	};
 
 	async onload() {
 		await this.loadSettings();
 
+		this.writeToVerboseLogFile("LOG: getAccessToken");
 		var res: any = await getAccessToken(this.settings.refreshToken, true); // get accessToken
 		var count = 0;
 		while (res == "error") {
+			this.writeToVerboseLogFile("LOG: failed to fetch accessToken");
 			if (!this.settings.refreshToken) {
+				this.writeToVerboseLogFile("LOG: no refreshToken");
 				break;
 			}
 			console.log("Trying to get accessToken again after 5secs...");
@@ -757,6 +826,9 @@ export default class driveSyncPlugin extends Plugin {
 				resolvePromise();
 			}, 5000);
 			await promise;
+			this.writeToVerboseLogFile(
+				"LOG: trying to fetch accessToken again"
+			);
 			res = await getAccessToken(this.settings.refreshToken);
 			count++;
 			if (count == 6) {
@@ -802,24 +874,35 @@ export default class driveSyncPlugin extends Plugin {
 			}
 		}
 
-		if (res != "error") {
-			// if accessToken is available
-			this.settings.accessToken = res.access_token;
-			this.settings.validToken = true;
-			var folders = await getFoldersList(this.settings.accessToken); // look for obsidian folder
-			var reqFolder = folders.filter(
-				(folder: any) => folder.name == "obsidian"
-			);
-			if (reqFolder.length) {
-				this.settings.rootFolderId = reqFolder[0].id; // set the rootFolder or obsidian folder id
-			} else {
-				new Notice("Initializing required files"); // else create the folder
-				this.settings.rootFolderId = await uploadFolder(
-					this.settings.accessToken,
-					"obsidian"
+		try {
+			if (res != "error") {
+				this.writeToVerboseLogFile("LOG: received accessToken");
+				// if accessToken is available
+				this.settings.accessToken = res.access_token;
+				this.settings.validToken = true;
+				var folders = await getFoldersList(this.settings.accessToken); // look for obsidian folder
+				var reqFolder = folders.filter(
+					(folder: any) => folder.name == "obsidian"
 				);
+				if (reqFolder.length) {
+					this.writeToVerboseLogFile("LOG: rootFolder available");
+					this.settings.rootFolderId = reqFolder[0].id; // set the rootFolder or obsidian folder id
+				} else {
+					this.writeToVerboseLogFile(
+						"LOG: rootFolder unavailable, uploading"
+					);
+					new Notice("Initializing required files"); // else create the folder
+					this.settings.rootFolderId = await uploadFolder(
+						this.settings.accessToken,
+						"obsidian"
+					);
+				}
+				this.saveSettings();
 			}
-			this.saveSettings();
+		} catch (err) {
+			this.notifyError();
+			this.writeToErrorLogFile(err);
+			new Notice("FATAL ERROR: Could not upload rootFile");
 		}
 		// else {
 		// 	// accessToken is not available
@@ -828,6 +911,7 @@ export default class driveSyncPlugin extends Plugin {
 		// }
 		if (this.settings.validToken) {
 			try {
+				this.writeToVerboseLogFile("LOG: getting vault id");
 				this.settings.vaultId = await getVaultId(
 					// get vaultId for the current fold
 					this.settings.accessToken,
@@ -843,6 +927,7 @@ export default class driveSyncPlugin extends Plugin {
 				return;
 			}
 			if (this.settings.vaultId == "NOT FOUND") {
+				this.writeToVerboseLogFile("LOG: vault not found");
 				// if vault doesn't exist
 				this.settings.vaultInit = false;
 				new Notice(
@@ -866,6 +951,7 @@ export default class driveSyncPlugin extends Plugin {
 		}
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
+		this.writeToVerboseLogFile("LOG: adding settings UI");
 		this.addSettingTab(new syncSettings(this.app, this));
 		if (!this.settings.vaultInit) return;
 
@@ -883,10 +969,16 @@ export default class driveSyncPlugin extends Plugin {
 					return;
 				}
 				if (this.completingPendingSync) {
+					this.writeToVerboseLogFile(
+						"LOG: not renaming as pending sync is ongoing"
+					);
 					return;
 				}
 				try {
 					if (!this.connectedToInternet) {
+						this.writeToVerboseLogFile(
+							"LOG: Connectivity lost, not renaming files to Google Drive"
+						);
 						console.log(
 							"ERROR: Connectivity lost, not renaming files to Google Drive..."
 						);
@@ -900,6 +992,9 @@ export default class driveSyncPlugin extends Plugin {
 							!this.cloudFiles.includes(oldpath) &&
 							!this.renamedWhileOffline.get(oldpath)
 						) {
+							this.writeToVerboseLogFile(
+								"LOG: new file created while offline"
+							);
 							if (newFile instanceof TFile) {
 								let id = randomUUID();
 								this.pendingSyncItems.push({
@@ -912,6 +1007,9 @@ export default class driveSyncPlugin extends Plugin {
 								this.finalNamesForFileID.set(id, newFile.path);
 							}
 						} else {
+							this.writeToVerboseLogFile(
+								"LOG: renamed while offline"
+							);
 							let idIfWasAlreadyRenamedOffline =
 								this.renamedWhileOffline.get(oldpath);
 							let id: string;
@@ -949,6 +1047,7 @@ export default class driveSyncPlugin extends Plugin {
 						return;
 					}
 
+					this.writeToVerboseLogFile("LOG: renaming while online");
 					/* actual renaming of file */
 					var id;
 					var reqFile = ""; // required for changing the name of the file in the cloudsFile list
@@ -973,6 +1072,7 @@ export default class driveSyncPlugin extends Plugin {
 						this.renamingList.indexOf(oldpath),
 						1
 					);
+					this.writeToVerboseLogFile("LOG: renamed while online");
 
 					this.refreshFilesListInDriveAndStoreInSettings();
 				} catch (err) {
@@ -989,6 +1089,9 @@ export default class driveSyncPlugin extends Plugin {
 					return;
 				}
 				if (this.completingPendingSync) {
+					this.writeToVerboseLogFile(
+						"LOG: not uploading as pending sync is ongoing"
+					);
 					return;
 				}
 				try {
@@ -996,8 +1099,14 @@ export default class driveSyncPlugin extends Plugin {
 						console.log(
 							"ERROR: Connectivity lost, not uploading files to Google Drive..."
 						);
+						this.writeToVerboseLogFile(
+							"LOG: Connectivity lost, not uploading files to Google Drive"
+						);
 						if (e instanceof TFile && !/-synced\.*/.test(e.path)) {
 							if (e.extension != "md") {
+								this.writeToVerboseLogFile(
+									"LOG: created attachment while offline"
+								);
 								let id = randomUUID();
 								this.pendingSyncItems.push({
 									action: "UPLOAD",
@@ -1016,6 +1125,9 @@ export default class driveSyncPlugin extends Plugin {
 
 					if (e instanceof TFile && !/-synced\.*/.test(e.path)) {
 						if (e.extension != "md") {
+							this.writeToVerboseLogFile(
+								"LOG: created attachment while online"
+							);
 							await this.uploadNewAttachment(e);
 						}
 					}
@@ -1033,6 +1145,9 @@ export default class driveSyncPlugin extends Plugin {
 					return;
 				}
 				if (this.completingPendingSync) {
+					this.writeToVerboseLogFile(
+						"LOG: not deleting as pending sync is ongoing"
+					);
 					return;
 				}
 
@@ -1041,12 +1156,18 @@ export default class driveSyncPlugin extends Plugin {
 						console.log(
 							"ERROR: Connectivity lost, not deleting files from Google Drive..."
 						);
+						this.writeToVerboseLogFile(
+							"LOG: Connectivity lost, not deleting files from Google Drive"
+						);
 						let id;
 						this.settings.filesList.map((file, index) => {
 							if (file.name == e.path) {
 								id = file.id;
 							}
 						});
+						this.writeToVerboseLogFile(
+							"LOG: deleting while offline"
+						);
 						this.pendingSyncItems.push({
 							fileID: id,
 							action: "DELETE",
@@ -1066,6 +1187,7 @@ export default class driveSyncPlugin extends Plugin {
 					});
 					this.deletingList.push(e.path);
 
+					this.writeToVerboseLogFile("LOG: deleting while online");
 					var successful = await deleteFile(
 						this.settings.accessToken,
 						id
@@ -1092,12 +1214,18 @@ export default class driveSyncPlugin extends Plugin {
 					return;
 				}
 				if (this.completingPendingSync) {
+					this.writeToVerboseLogFile(
+						"LOG: not modifying because pending sync"
+					);
 					return;
 				}
 				try {
 					if (!this.connectedToInternet) {
 						console.log(
 							"ERROR: Connectivity lost, not modifying files on Google Drive..."
+						);
+						this.writeToVerboseLogFile(
+							"LOG: Connectivity lost, not modifying files on Google Drive"
 						);
 						if (!this.cloudFiles.length) {
 							console.log(
@@ -1110,6 +1238,9 @@ export default class driveSyncPlugin extends Plugin {
 							!this.renamedWhileOffline.get(e.path)
 						) {
 							if (e instanceof TFile) {
+								this.writeToVerboseLogFile(
+									"LOG: created file while offline"
+								);
 								let id = randomUUID();
 								this.pendingSyncItems.push({
 									newFileName: e.path,
@@ -1141,7 +1272,9 @@ export default class driveSyncPlugin extends Plugin {
 							) {
 								this.pendingSyncItems.pop();
 							}
-
+							this.writeToVerboseLogFile(
+								"LOG: modifying file while offline"
+							);
 							this.pendingSyncItems.push({
 								fileID: id,
 								action: "MODIFY",
@@ -1153,6 +1286,9 @@ export default class driveSyncPlugin extends Plugin {
 					}
 					if (!this.cloudFiles.includes(e.path)) {
 						if (e instanceof TFile) {
+							this.writeToVerboseLogFile(
+								"LOG: created file while online"
+							);
 							this.uploadNewNotesFile(e);
 						}
 						return;
@@ -1189,6 +1325,9 @@ export default class driveSyncPlugin extends Plugin {
 						});
 						var buffer = await this.app.vault.readBinary(e);
 						while (this.syncQueue) {
+							this.writeToVerboseLogFile(
+								"LOG: modifying file while online"
+							);
 							var res = await modifyFile(
 								this.settings.accessToken,
 								id,
@@ -1426,12 +1565,23 @@ class syncSettings extends PluginSettingTab {
 		}
 
 		new Setting(containerEl)
-			.setName("Enable logging")
+			.setName("Enable Error logging")
 			.setDesc("Error logs will appear in a .md file")
 			.addToggle((toggle) => {
-				toggle.setValue(this.plugin.settings.loggingToFile);
+				toggle.setValue(this.plugin.settings.errorLoggingToFile);
 				toggle.onChange((val) => {
-					this.plugin.settings.loggingToFile = val;
+					this.plugin.settings.errorLoggingToFile = val;
+					this.plugin.saveSettings();
+				});
+			});
+
+		new Setting(containerEl)
+			.setName("Enable Verbose logging")
+			.setDesc("Verbose logs will appear in a .md file")
+			.addToggle((toggle) => {
+				toggle.setValue(this.plugin.settings.verboseLoggingToFile);
+				toggle.onChange((val) => {
+					this.plugin.settings.verboseLoggingToFile = val;
 					this.plugin.saveSettings();
 				});
 			});
