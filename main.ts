@@ -353,6 +353,8 @@ export default class driveSyncPlugin extends Plugin {
 				6000
 			);
 			var filesList = this.app.vault.getFiles();
+			let noOfFiles = filesList.length;
+			let count = 1;
 			for (const file of filesList) {
 				const buffer: any = await this.app.vault.readBinary(file);
 				await uploadFile(
@@ -361,6 +363,7 @@ export default class driveSyncPlugin extends Plugin {
 					buffer,
 					this.settings.vaultId
 				);
+				new Notice("Uploaded " + count + "/" + noOfFiles + " files");
 			}
 			new Notice("Files uploaded!");
 			new Notice("Please reload the plug-in.", 5000);
