@@ -363,6 +363,7 @@ export default class driveSyncPlugin extends Plugin {
 					buffer,
 					this.settings.vaultId
 				);
+				count++;
 				new Notice("Uploaded " + count + "/" + noOfFiles + " files");
 			}
 			new Notice("Files uploaded!");
