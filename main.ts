@@ -354,7 +354,7 @@ export default class driveSyncPlugin extends Plugin {
 			);
 			var filesList = this.app.vault.getFiles();
 			let noOfFiles = filesList.length;
-			let count = 1;
+			let count = 0;
 			for (const file of filesList) {
 				const buffer: any = await this.app.vault.readBinary(file);
 				await uploadFile(
