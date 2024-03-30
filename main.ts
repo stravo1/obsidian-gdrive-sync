@@ -145,9 +145,16 @@ export default class driveSyncPlugin extends Plugin {
 	renamedWhileOffline: Map<string, string> = new Map();
 	finalNamesForFileID: Map<string, string> = new Map();
 	completingPendingSync: boolean = false;
-	loggingForTheFirstTime: boolean = true;
+	verboseLoggingForTheFirstTimeInThisSession: boolean = true;
+	errorLoggingForTheFirstTimeInThisSession: boolean = true;
+	lastErrorTime: Date = new Date(0);
+	totalErrorsWithinAMinute: number = 0;
+	haltAllOperations: boolean = false;
 
 	completeAllPendingSyncs = async () => {
+		if (this.haltAllOperations) {
+			return;
+		}
 		/* files created when offline are assigned a dummy fileId 
 		so the following Map keeps track of the dummy fielId to the actual fileId 
 		which is retrieved when the file is uploadedf for the first time when online */
@@ -301,6 +308,9 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	checkForConnectivity = async () => {
+		if (this.haltAllOperations) {
+			return;
+		}
 		try {
 			this.writeToVerboseLogFile("LOG: Entering checkForConnectivity");
 			await fetch("https://www.github.com/stravo1", {
@@ -330,14 +340,47 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	notifyError = () => {
+		if (this.haltAllOperations) {
+			return;
+		}
 		if (!this.pendingSync) {
 			this.pendingSync = true;
 			new Notice("ERROR: Something went wrong! Sync is paused.");
 		}
 		this.writeToVerboseLogFile("LOG: Error occured");
+		// check if the time between this error and last error was less than a minute:
+		if (new Date().getTime() - this.lastErrorTime.getTime() < 60000) {
+			this.totalErrorsWithinAMinute++;
+		} else {
+			this.totalErrorsWithinAMinute = 0;
+		}
+		if (this.totalErrorsWithinAMinute > 5) {
+			this.haltAllOperations = true;
+			setTimeout(async () => {
+				await this.writeToErrorLogFile(
+					new Error("FATAL ERROR: Too many errors within a minute.")
+				);
+				await this.writeToVerboseLogFile(
+					"LOG: Too many errors within a minute. Halting all operations."
+				);
+				new Notice(
+					"FATAL ERROR: Too many errors within a minute. Please reload the plug-in. If error persists, check the Verbose and Error Logs (turn them on in plug-in settings).",
+					5000
+				);
+				new Notice(
+					"Report issue by attaching the log files at https://github.com/stravo1/obsidian-gdrive-sync/issues/new",
+					5000
+				);
+			}, 1500);
+		}
+
+		this.lastErrorTime = new Date();
 	};
 
 	cleanInstall = async () => {
+		if (this.haltAllOperations) {
+			return;
+		}
 		try {
 			this.writeToVerboseLogFile("LOG: Enerting cleanInstall");
 			new Notice("Creating vault in Google Drive...");
@@ -377,6 +420,9 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	refreshAll = async () => {
+		if (this.haltAllOperations) {
+			return;
+		}
 		this.writeToVerboseLogFile("LOG: Entering refreshAll");
 		try {
 			if (!this.connectedToInternet) {
@@ -493,6 +539,9 @@ export default class driveSyncPlugin extends Plugin {
 		this.writeToVerboseLogFile("LOG: Exited refreshAll");
 	};
 	uploadNewNotesFile = async (newFile: TFile) => {
+		if (this.haltAllOperations) {
+			return;
+		}
 		try {
 			this.writeToVerboseLogFile("LOG: Entering uploadNewNotesFile");
 			if (!this.connectedToInternet) {
@@ -542,6 +591,7 @@ export default class driveSyncPlugin extends Plugin {
 			this.currentlyUploading = null;
 
 			new Notice("Uploaded!");
+			this.writeToVerboseLogFile("LOG: Exited uploadNewNotesFile");
 			return id;
 		} catch (err) {
 			this.notifyError();
@@ -549,8 +599,8 @@ export default class driveSyncPlugin extends Plugin {
 			this.writeToErrorLogFile(err);
 			this.writingFile = false;
 			this.currentlyUploading = null;
+			this.writeToVerboseLogFile("LOG: Exited uploadNewNotesFile");
 		}
-		this.writeToVerboseLogFile("LOG: Exited uploadNewNotesFile");
 	};
 
 	getLatestContent = async (
@@ -558,6 +608,9 @@ export default class driveSyncPlugin extends Plugin {
 		forced: "forced" | false = false
 	) => {
 		try {
+			if (this.haltAllOperations) {
+				return;
+			}
 			this.writeToVerboseLogFile("LOG: Entering getLatestContent");
 			if (!this.connectedToInternet) {
 				console.log(
@@ -625,6 +678,9 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	uploadNewAttachment = async (e: TFile) => {
+		if (this.haltAllOperations) {
+			return;
+		}
 		try {
 			this.writeToVerboseLogFile("LOG: Entering uploadNewAttachment");
 			new Notice("Uploading new attachment!");
@@ -731,6 +787,9 @@ export default class driveSyncPlugin extends Plugin {
 		this.writeToVerboseLogFile("LOG: Exited writeToPendingSyncFile");
 	};
 	refreshFilesListInDriveAndStoreInSettings = async () => {
+		if (this.haltAllOperations) {
+			return;
+		}
 		/*
 		fetches all the files that are backed-up in drive and
 		stores them in data.json file which contains all the settings,
@@ -769,13 +828,16 @@ export default class driveSyncPlugin extends Plugin {
 		let content: string;
 
 		if (errorLogFile instanceof TFile) {
-			content = await this.app.vault.read(errorLogFile);
+			content = !this.errorLoggingForTheFirstTimeInThisSession
+				? await this.app.vault.read(errorLogFile)
+				: "";
 			await this.app.vault.modify(
 				errorLogFile,
 				`${content}\n\n${new Date().toString()}-${log.name}-${
 					log.message
 				}-${log.stack}`
 			);
+			this.errorLoggingForTheFirstTimeInThisSession = false;
 		} else {
 			await this.app.vault.create(
 				ERROR_LOG_FILE_NAME,
@@ -799,14 +861,14 @@ export default class driveSyncPlugin extends Plugin {
 		let content: string;
 
 		if (errorLogFile instanceof TFile) {
-			content = !this.loggingForTheFirstTime
+			content = !this.verboseLoggingForTheFirstTimeInThisSession
 				? await this.app.vault.read(errorLogFile)
 				: "";
 			await this.app.vault.modify(errorLogFile, `${content}\n\n${log}`);
+			this.verboseLoggingForTheFirstTimeInThisSession = false;
 		} else {
 			await this.app.vault.create(VERBOSE_LOG_FILE_NAME, `${log}`);
 		}
-		this.loggingForTheFirstTime = false;
 	};
 
 	async onload() {
@@ -816,6 +878,14 @@ export default class driveSyncPlugin extends Plugin {
 		var res: any = await getAccessToken(this.settings.refreshToken, true); // get accessToken
 		var count = 0;
 		while (res == "error") {
+			new Notice(
+				"ERROR: Couldn't fetch accessToken. Trying again in 5 secs, please wait..."
+			);
+			this.writeToErrorLogFile(
+				new Error(
+					"ERROR: Couldn't fetch accessToken. Trying again in 5 secs."
+				)
+			);
 			this.writeToVerboseLogFile("LOG: failed to fetch accessToken");
 			if (!this.settings.refreshToken) {
 				this.writeToVerboseLogFile("LOG: no refreshToken");
