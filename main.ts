@@ -345,7 +345,7 @@ export default class driveSyncPlugin extends Plugin {
 		}
 		if (!this.pendingSync) {
 			this.pendingSync = true;
-			new Notice("ERROR: Something went wrong! Sync is paused.");
+			new Notice("ERROR: Something went wrong! Sync might be paused!");
 		}
 		this.writeToVerboseLogFile("LOG: Error occured");
 		// check if the time between this error and last error was less than a minute:
@@ -705,9 +705,10 @@ export default class driveSyncPlugin extends Plugin {
 
 			this.currentlyUploading = null;
 			new Notice("Uploaded!");
+
 			new Notice(
 				"Please make sure that all links to this attachment are updated with the new name: " +
-					newFileName.match(/\/.*-synced\..*$/)![0].slice(1),
+					newFileName,
 				5000
 			);
 			return id;
