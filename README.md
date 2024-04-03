@@ -6,6 +6,8 @@ The Obsidian Google Drive Sync Plugin is a plugin that allows you to seamlessly 
 
 This plugin is designed to be easy to install and configure compared to other plugins, no need to tackle git repos or manage Google Cloud Projects or setup any other external app.
 
+> ⚠️ The plugin is under active development, new releases might introduce bugs, old releases maybe be incompatible with the new ones. This might lead to data loss. Some workarounds (like [this](#q-why-are-my-attachments-being-renamed)) being used might create more problems. So please create a BACKUP of your vault before you install and try this plugin.
+
 ## Features
 
 - **Simple Installation**: Although the plugin is not yet listed in the official [Obsidian Plugins List](https://obsidian.md/plugins), still it's relatively [easy to install](#installation).
@@ -47,6 +49,24 @@ Configuring the plugin is straightforward:
 5. Once the previous steps are complete, set your preferred synchronization interval.
 
 6. Enjoy auto sync, for free!
+
+## FAQs
+#### Q. Does this plgin work for Android/iOS?  
+Yes it does! The entire purpose of this plugin is to make sure that you have access to your notes no matter where you are and what device you are using. So how to install the plugin on:  
+Android: it's exactly how you would install it on your desktop: download the latest release zip, extract it, copy the folder to `.obsidian/plugins` under the location where you chose to create the vault. Here's a [video walkthrough](https://github.com/stravo1/obsidian-gdrive-sync/issues/4#issuecomment-2022138355).  
+iOS: There's not a conventional way of installing these unofficial plugins on your iOS devices. The only option as of now is to create the vault, install the plugin and copy over the entire vault from desktop to the iOS device. If you have installed the plugin in an existing vault, you can copy over the vault as is. Here's some links: [Github comment](https://github.com/stravo1/obsidian-gdrive-sync/issues/12#issuecomment-2028541154) - [Reddit Thread](https://www.reddit.com/r/ObsidianMD/comments/p9evrs/manually_install_plugins_on_ios/)
+  
+#### Q. What's the `lastSync: ...` thing under properties/tags?  
+The plugin keeps track of the last time the file was synced on a particular device using a "property" or YAML tag named `lastSync`. This keeps changing as the note is continuously synced. Please refrain from editing that tag. [Read more](https://github.com/stravo1/obsidian-gdrive-sync/issues/9#issuecomment-2026540794)
+  
+#### Q. Why are my attachments being renamed?  
+The attachments are renamed when they are uploaded because unlike in notes there's no "lastSync" tag that the plug-in can read from the note's content, so to differentiate between which attachments are synced and which are not it's renamed to "attachment_name-synced". I am actively trying to create a workaround for this, but it will take time.  
+  
+#### Q. Does the vault need to have the same name across devices?  
+A. Yes! The plug-in can be used to sync multiple vaults, and it uses the vault name to identify which vault is being currently worked on and need to be synced, you need to keep the vault name same across devices so that changes made under "sample-vault" on one device appears under "sample-vault" on your other devices as well.  
+  
+#### Q. Why is this plugin not on the official Obsidian Plugin List?  
+A. It is very much in beta and not ready for "public" release, and will require a lot of testing and changes before it can be listed on the official plugins' list. there's a genuine risk of data loss (although i have tried my best to cover all edge cases but can't risk other people's data solely on my coding skills 😅). tldr: personally i don't want an unfinished plug-in with risk of data loss being listed as "official" :)
 
 ## Troubleshooting & Support
 
