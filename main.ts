@@ -72,9 +72,10 @@ const getAccessToken = async (
 			if ((err.code = "ERR_NETWORK") && showError) {
 				new Notice("Oops! Network error :(");
 				new Notice("Or maybe no refresh token provided?", 5000);
+				response = "network_error";
+			} else {
+				response = "error";
 			}
-
-			response = "error";
 		});
 	return response;
 };
@@ -974,7 +975,7 @@ export default class driveSyncPlugin extends Plugin {
 		}
 
 		try {
-			if (res != "error") {
+			if (res != "error" && res != "network_error") {
 				await this.writeToVerboseLogFile("LOG: received accessToken");
 				// if accessToken is available
 				this.settings.accessToken = res.access_token;
@@ -1003,7 +1004,7 @@ export default class driveSyncPlugin extends Plugin {
 		} catch (err) {
 			await this.notifyError();
 			await this.writeToErrorLogFile(err);
-			new Notice("FATAL ERROR: Could not upload rootFile");
+			new Notice("FATAL ERROR: Could not fetch rootFolder");
 		}
 		// else {
 		// 	// accessToken is not available

@@ -39,7 +39,7 @@ const uploadFile = async (
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
 			},
-
+			contentType: "application/json",
 			body: JSON.stringify({
 				//mimeType: "text/pain",
 				name: fileName,
@@ -55,7 +55,7 @@ const uploadFile = async (
 				headers: {
 					Authorization: `Bearer ${accessToken}`,
 				},
-
+				contentType: "application/json",
 				body: buffer,
 			}).catch((e) => console.log(e));
 		}
@@ -75,7 +75,7 @@ const modifyFile = async (accessToken, fileId, buffer) => {
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
 			},
-
+			contentType: "application/json",
 			body: buffer,
 		}).catch((e) => console.log(e));
 		return res;
@@ -92,9 +92,8 @@ const renameFile = async (accessToken, fileId, newName) => {
 			method: "PATCH",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
-				"Content-Type": "application/json",
 			},
-
+			contentType: "application/json",
 			body: JSON.stringify({
 				name: newName,
 			}),
@@ -115,8 +114,8 @@ const deleteFile = async (accessToken, fileId) => {
 			method: "DELETE",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
-				"Content-Type": "application/json",
 			},
+			contentType: "application/json",
 		})
 		if (response.status == 404) {
 			return false;
@@ -140,7 +139,7 @@ const uploadFolder = async (accessToken, foldername, rootId = null) => {
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
 			},
-
+			contentType: "application/json",
 			body: JSON.stringify({
 				mimeType: "application/vnd.google-apps.folder",
 				name: foldername,
@@ -168,6 +167,7 @@ const getFilesList = async (accessToken, vault) => {
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
 			},
+			contentType: "application/json",
 		});
 		let files = response.json.files;
 		let isNextPageAvailable = response.json.nextPageToken ? true : false;
@@ -184,6 +184,7 @@ const getFilesList = async (accessToken, vault) => {
 				headers: {
 					Authorization: `Bearer ${accessToken}`,
 				},
+				contentType: "application/json",
 			});
 			files = files.concat(response.json.files);
 			isNextPageAvailable = response.json.nextPageToken ? true : false;
@@ -210,7 +211,7 @@ const getFoldersList = async (accessToken, vault = null) => {
 		let folders = response.json.files;
 		let isNextPageAvailable = response.json.nextPageToken ? true : false;
 		let nextPageToken = response.json.nextPageToken;
-		while(isNextPageAvailable) {
+		while (isNextPageAvailable) {
 			const response = await requestUrl({
 				url:
 					"https://www.googleapis.com/drive/v3/files?q=mimeType%20%3D%20'application%2Fvnd.google-apps.folder'" +
@@ -246,7 +247,6 @@ const getFile = async (accessToken, fileId) => {
 		});
 		const responseName = await requestUrl({
 			url: "https://www.googleapis.com/drive/v3/files/" + fileId,
-
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
