@@ -38,7 +38,6 @@ const uploadFile = async (
 			method: "POST",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
-				"Content-Type": "application/json",
 			},
 
 			body: JSON.stringify({
@@ -140,7 +139,6 @@ const uploadFolder = async (accessToken, foldername, rootId = null) => {
 			method: "POST",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
-				"Content-Type": "application/json",
 			},
 
 			body: JSON.stringify({
@@ -169,7 +167,6 @@ const getFilesList = async (accessToken, vault) => {
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
-				Accept: "application/json",
 			},
 		});
 		let files = response.json.files;
@@ -186,7 +183,6 @@ const getFilesList = async (accessToken, vault) => {
 				method: "GET",
 				headers: {
 					Authorization: `Bearer ${accessToken}`,
-					Accept: "application/json",
 				},
 			});
 			files = files.concat(response.json.files);
