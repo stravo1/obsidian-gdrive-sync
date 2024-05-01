@@ -13,6 +13,7 @@ const getVaultId = async (accessToken, vault, root = null) => {
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
+				Accept: "application/json",
 			},
 		}).catch((e) => console.log(e));
 		const list = response.json.files;
@@ -38,6 +39,7 @@ const uploadFile = async (
 			method: "POST",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
+				Accept: "application/json",
 			},
 			contentType: "application/json",
 			body: JSON.stringify({
@@ -54,6 +56,7 @@ const uploadFile = async (
 				method: "PATCH",
 				headers: {
 					Authorization: `Bearer ${accessToken}`,
+					Accept: "application/json",
 				},
 				contentType: "application/json",
 				body: buffer,
@@ -74,6 +77,7 @@ const modifyFile = async (accessToken, fileId, buffer) => {
 			method: "PATCH",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
+				Accept: "application/json",
 			},
 			contentType: "application/json",
 			body: buffer,
@@ -92,6 +96,7 @@ const renameFile = async (accessToken, fileId, newName) => {
 			method: "PATCH",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
+				Accept: "application/json",
 			},
 			contentType: "application/json",
 			body: JSON.stringify({
@@ -114,6 +119,7 @@ const deleteFile = async (accessToken, fileId) => {
 			method: "DELETE",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
+				Accept: "application/json",
 			},
 			contentType: "application/json",
 		})
@@ -138,6 +144,7 @@ const uploadFolder = async (accessToken, foldername, rootId = null) => {
 			method: "POST",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
+				Accept: "application/json",
 			},
 			contentType: "application/json",
 			body: JSON.stringify({
@@ -166,6 +173,7 @@ const getFilesList = async (accessToken, vault) => {
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
+				Accept: "application/json",
 			},
 			contentType: "application/json",
 		});
@@ -183,6 +191,7 @@ const getFilesList = async (accessToken, vault) => {
 				method: "GET",
 				headers: {
 					Authorization: `Bearer ${accessToken}`,
+					Accept: "application/json",
 				},
 				contentType: "application/json",
 			});
@@ -206,6 +215,7 @@ const getFoldersList = async (accessToken, vault = null) => {
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
+				Accept: "application/json",
 			},
 		});
 		let folders = response.json.files;
@@ -268,6 +278,7 @@ const getFileInfo = async (accessToken, id) => {
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
+				Accept: "application/json",
 			},
 		});
 		return response;
