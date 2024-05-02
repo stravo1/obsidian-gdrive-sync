@@ -168,7 +168,7 @@ const getFilesList = async (accessToken, vault) => {
 			url:
 				"https://www.googleapis.com/drive/v3/files" +
 				(vault != null
-					? `?q='${vault}'%20in%20parents&fields=files(name, modifiedTime, mimeType, id),nextPageToken&pageSize=1000`
+					? `?q='${vault}'%20in%20parents&fields=files(name, modifiedTime, mimeType, id)&pageSize=1000`
 					: ""),
 			method: "GET",
 			headers: {
@@ -185,7 +185,7 @@ const getFilesList = async (accessToken, vault) => {
 				url:
 					"https://www.googleapis.com/drive/v3/files" +
 					(vault != null
-						? `?q='${vault}'%20in%20parents&fields=files(name, modifiedTime, mimeType, id),nextPageToken&pageSize=1000`
+						? `?q='${vault}'%20in%20parents&fields=files(name, modifiedTime, mimeType, id)&pageSize=1000`
 						: "") +
 					`&pageToken=${nextPageToken}`,
 				method: "GET",
@@ -211,7 +211,7 @@ const getFoldersList = async (accessToken, vault = null) => {
 		const response = await requestUrl({
 			url:
 				"https://www.googleapis.com/drive/v3/files?q=mimeType%20%3D%20'application%2Fvnd.google-apps.folder'" +
-				(vault != null ? `%20and%20'${vault}'%20in%20parents` : "") + "&fields=files(name, id),nextPageToken&pageSize=1000",
+				(vault != null ? `%20and%20'${vault}'%20in%20parents` : "") + "&fields=files(name, id)&orderBy=createdTime&pageSize=1000",
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
@@ -219,13 +219,14 @@ const getFoldersList = async (accessToken, vault = null) => {
 			},
 		});
 		let folders = response.json.files;
+		console.log(folders);
 		let isNextPageAvailable = response.json.nextPageToken ? true : false;
 		let nextPageToken = response.json.nextPageToken;
 		while (isNextPageAvailable) {
 			const response = await requestUrl({
 				url:
 					"https://www.googleapis.com/drive/v3/files?q=mimeType%20%3D%20'application%2Fvnd.google-apps.folder'" +
-					(vault != null ? `%20and%20'${vault}'%20in%20parents` : "") + "&fields=files(name, id),nextPageToken&pageSize=1000" +
+					(vault != null ? `%20and%20'${vault}'%20in%20parents` : "") + "&fields=files(name, id)&orderBy=createdTime%20desc&pageSize=1000" +
 					`&pageToken=${nextPageToken}`,
 				method: "GET",
 				headers: {
