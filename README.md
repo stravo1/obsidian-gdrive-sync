@@ -85,8 +85,8 @@ If you need assistance or have questions, feel free to reach out to us by [creat
 
 ## Feedback and Contributions
 
-I welcome any feedback and contributions to improve this plugin. If you have suggestions, encounter issues, or want to contribute to its development, please visit our [GitHub repository](https://github.com/stravo1/obsidian-gdrive-sync) and create an issue or pull request.
+If you have suggestions, encounter issues, or want to contribute to its development, please visit our [GitHub repository](https://github.com/stravo1/obsidian-gdrive-sync) and create an issue or pull request.
 
 ---
 
-Happy syncing! Enjoy the simplicity and convenience of auto-syncing your Obsidian notes with Google Drive using this plugin. I hope it enhances your Obsidian experience and simplifies your note-taking journey :)
+Happy syncing!
