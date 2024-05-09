@@ -53,6 +53,26 @@ function mapToObject(map: Map<string, string>) {
 	return obj;
 }
 
+function bufferEqual(a: ArrayBuffer, b: ArrayBuffer) {
+	let c: Uint8Array = new Uint8Array(a, 0);
+	let d: Uint8Array = new Uint8Array(b, 0);
+	if (a.byteLength != b.byteLength) return false;
+	return equal8(c, d);
+}
+
+function equal8(a: Uint8Array, b: Uint8Array) {
+	const ua = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+	const ub = new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+	return compare(ua, ub);
+}
+
+function compare(a: Uint8Array, b: Uint8Array) {
+	for (let i = a.length; -1 < i; i -= 1) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
+}
+
 const getAccessToken = async (
 	refreshToken: string,
 	showError: boolean = false
@@ -134,7 +154,9 @@ export default class driveSyncPlugin extends Plugin {
 	timer: any = null;
 	alreadyRefreshing: boolean = false;
 	writingFile: boolean = false;
-	syncQueue: boolean = false;
+	syncQueue: string[] = [];
+	isUploadingCurrentFile: boolean = false;
+	latestContentThatWasSynced: ArrayBuffer | null = null;
 	currentlyUploading: string | null = null; // to mitigate the issue of deleting recently created file while its being uploaded and gets overlaped with the auto-trash function call
 	renamingList: string[] = [];
 	deletingList: string[] = [];
@@ -629,7 +651,10 @@ export default class driveSyncPlugin extends Plugin {
 				);
 				return;
 			}
-			if (this.cloudFiles.includes(file?.path!) && !this.syncQueue) {
+			if (
+				this.cloudFiles.includes(file?.path!) &&
+				!this.syncQueue.length
+			) {
 				var index = this.cloudFiles.indexOf(file?.path!);
 
 				var cloudDate = new Date(
@@ -642,7 +667,7 @@ export default class driveSyncPlugin extends Plugin {
 				if (file.extension != "md") {
 					isBinaryFile = true;
 				} else {
-					content = await this.app.vault.read(file!);
+					content = await this.app.vault.cachedRead(file!);
 					timeStamp = content.match(/lastSync:.*/);
 				}
 
@@ -665,8 +690,17 @@ export default class driveSyncPlugin extends Plugin {
 						}
 					});
 					var res = await getFile(this.settings.accessToken, id);
-					if (this.syncQueue && !isBinaryFile) return;
+					console.log("here", this.writingFile);
+
+					if (
+						this.syncQueue.length ||
+						isBinaryFile ||
+						this.writingFile
+					)
+						return;
+
 					//console.log(this.syncQueue);
+					this.latestContentThatWasSynced = res[1];
 
 					await this.app.vault
 						.modifyBinary(file, res[1])
@@ -686,6 +720,49 @@ export default class driveSyncPlugin extends Plugin {
 			await this.writeToErrorLogFile(err);
 		}
 		await this.writeToVerboseLogFile("LOG: Exited getLatestContent");
+	};
+	emptySyncQueue = async () => {
+		if (this.haltAllOperations) {
+			return;
+		}
+
+		await this.writeToVerboseLogFile("LOG: Entering emptySyncQueue");
+		let path = this.syncQueue.shift(); // this tells that, uptil this moment, all changes are being accounted for the 1st file in sync queue
+		this.isUploadingCurrentFile = true; // this ensures only one upload operation is going on at a time
+
+		let file = this.app.vault.getAbstractFileByPath(path!);
+		if (!(file instanceof TFile)) {
+			return;
+		}
+
+		var id;
+		this.settings.filesList.map((f: any) => {
+			if (f.name == file!.path) {
+				id = f.id;
+			}
+		});
+
+		await this.updateLastSyncMetaTag(file);
+		var buffer = await this.app.vault.readBinary(file);
+		await modifyFile(this.settings.accessToken, id, buffer);
+
+		this.statusBarItem.classList.replace("sync_icon", "sync_icon_still");
+		setIcon(this.statusBarItem, "checkmark");
+
+		this.isUploadingCurrentFile = false;
+		await this.writeToVerboseLogFile("LOG: Exited emptySyncQueue");
+	};
+
+	checkAndEmptySyncQueue = async () => {
+		await this.writeToVerboseLogFile(
+			"LOG: Entering checkAndEmptySyncQueue"
+		);
+		if (this.haltAllOperations) {
+			return;
+		}
+		if (this.syncQueue.length && !this.isUploadingCurrentFile) {
+			this.emptySyncQueue();
+		}
 	};
 
 	uploadNewAttachment = async (e: TFile) => {
@@ -885,7 +962,7 @@ export default class driveSyncPlugin extends Plugin {
 					verboseLogFile,
 					`${content}\n\n${log}`
 				);
-				console.log("modified", log, `${content}\n\n${log}`);
+				// console.log("modified", log, `${content}\n\n${log}`);
 				this.verboseLoggingForTheFirstTimeInThisSession = false;
 			} else {
 				await this.app.vault.create(VERBOSE_LOG_FILE_NAME, `${log}`);
@@ -1048,6 +1125,11 @@ export default class driveSyncPlugin extends Plugin {
 					window.setInterval(async () => {
 						this.refreshAll();
 					}, parseInt(this.settings.refreshTime) * 1000)
+				);
+				this.registerInterval(
+					window.setInterval(async () => {
+						this.checkAndEmptySyncQueue();
+					}, 1000)
 				);
 			}
 		}
@@ -1401,65 +1483,70 @@ export default class driveSyncPlugin extends Plugin {
 						}
 						return;
 					}
-					this.syncQueue = true;
 
-					if (
-						!(e instanceof TFile) ||
-						this.writingFile ||
-						e.extension != "md"
-					) {
-						return;
-					}
-					if (this.timer) {
-						clearTimeout(this.timer);
-					}
+					this.writingFile = true;
+					this.statusBarItem.classList.replace(
+						"sync_icon_still",
+						"sync_icon"
+					);
+					setIcon(this.statusBarItem, "sync");
+					if (this.timer) clearTimeout(this.timer);
 					this.timer = setTimeout(async () => {
-						//console.log("UPDATING FILE");
-						this.statusBarItem.classList.replace(
-							"sync_icon_still",
-							"sync_icon"
-						);
-						setIcon(this.statusBarItem, "sync");
+						if (e instanceof TFile && e.extension == "md") {
+							var buffer = await this.app.vault.readBinary(e);
 
-						this.writingFile = true;
-
-						await this.updateLastSyncMetaTag(e);
-
-						var id;
-						this.settings.filesList.map((file: any) => {
-							if (file.name == e.path) {
-								id = file.id;
+							if (
+								this.latestContentThatWasSynced != null &&
+								bufferEqual(
+									buffer,
+									this.latestContentThatWasSynced
+								)
+							) {
+								console.log(
+									"ignoring modify trigger due to updation from getLatestContent"
+								);
+								this.statusBarItem.classList.replace(
+									"sync_icon",
+									"sync_icon_still"
+								);
+								setIcon(this.statusBarItem, "checkmark");
+								this.writingFile = false;
+								return;
 							}
-						});
-						var buffer = await this.app.vault.readBinary(e);
-						while (this.syncQueue) {
+							let content = await this.app.vault.cachedRead(e);
+							let timeStamp = content.match(/lastSync:.*/);
+							if (timeStamp) {
+								if (
+									Math.abs(
+										new Date(timeStamp[0]).getTime() -
+											new Date(e.stat.mtime).getTime()
+									) < 1000
+								) {
+									// same code repeated, deal with it later
+									console.log(
+										"ignoring modify trigger due to lastSyncTag updation"
+									);
+									this.statusBarItem.classList.replace(
+										"sync_icon",
+										"sync_icon_still"
+									);
+									setIcon(this.statusBarItem, "checkmark");
+									this.writingFile = false;
+									return;
+								}
+							}
+							if (this.syncQueue.contains(e.path)) return;
+							else this.syncQueue.push(e.path);
 							await this.writeToVerboseLogFile(
 								"LOG: modifying file while online"
 							);
-							var res = await modifyFile(
-								this.settings.accessToken,
-								id,
-								buffer
-							);
-							//console.log("refreshed!");
-							this.syncQueue = false;
 						}
-
 						this.writingFile = false;
-						this.timer = null;
-						this.statusBarItem.classList.replace(
-							"sync_icon",
-							"sync_icon_still"
-						);
-						setIcon(this.statusBarItem, "checkmark");
-					}, 2250);
+					}, 2500);
 				} catch (err) {
 					await this.notifyError();
 					await this.checkForConnectivity();
 					await this.writeToErrorLogFile(err);
-					this.syncQueue = false;
-					this.writingFile = false;
-					this.timer = null;
 				}
 			})
 		);
