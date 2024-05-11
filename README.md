@@ -81,7 +81,7 @@ If you encounter any issues with the plugin, check the following:
 - Check for any error messages in the Obsidian console and report the same by [creating an issue on GitHub](https://github.com/stravo1/obsidian-gdrive-sync/issues).
 
 
-If you need assistance or have questions, feel free to reach out to us by [creating an issue on GitHub](https://github.com/stravo1/obsidian-gdrive-sync/issues).
+If you need assistance or have questions, feel free to reach out to us by [creating an issue on GitHub](https://github.com/stravo1/obsidian-gdrive-sync/issues) or you can also [join the discord server](https://discord.com/invite/dPasX4Ac2P).
 
 ## Feedback and Contributions
 
