@@ -754,6 +754,7 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	checkAndEmptySyncQueue = async () => {
+		if (this.haltAllOperations) return;
 		await this.writeToVerboseLogFile(
 			"LOG: Entering checkAndEmptySyncQueue"
 		);
@@ -1080,8 +1081,17 @@ export default class driveSyncPlugin extends Plugin {
 			}
 		} catch (err) {
 			await this.notifyError();
+			await this.writeToVerboseLogFile(
+				"FATAL ERROR: Could not fetch rootFolder"
+			);
 			await this.writeToErrorLogFile(err);
+			await this.writeToErrorLogFile(
+				new Error("FATAL ERROR: Could not fetch rootFolder")
+			);
 			new Notice("FATAL ERROR: Could not fetch rootFolder");
+			await this.writeToVerboseLogFile("LOG: adding settings UI");
+			this.addSettingTab(new syncSettings(this.app, this));
+			return;
 		}
 		// else {
 		// 	// accessToken is not available
@@ -1102,7 +1112,12 @@ export default class driveSyncPlugin extends Plugin {
 				new Notice(
 					"FATAL ERROR: Couldn't get VaultID from Google Drive :("
 				);
+				await this.writeToVerboseLogFile(
+					"FATAL ERROR: Couldn't get VaultID from Google Drive :("
+				);
 				new Notice("Check internet connection and restart plugin.");
+				await this.writeToVerboseLogFile("LOG: adding settings UI");
+				this.addSettingTab(new syncSettings(this.app, this));
 				return;
 			}
 			if (this.settings.vaultId == "NOT FOUND") {
