@@ -105,6 +105,7 @@ const { randomUUID } = new ShortUniqueId({ length: 6 });
 interface driveValues {
 	refreshToken: string;
 	accessToken: string;
+	accessTokenExpiryTime: string;
 	validToken: Boolean;
 	vaultId: any;
 	vaultInit: boolean;
@@ -122,6 +123,7 @@ interface driveValues {
 const DEFAULT_SETTINGS: driveValues = {
 	refreshToken: "",
 	accessToken: "",
+	accessTokenExpiryTime: "",
 	validToken: false,
 	vaultId: "",
 	filesList: [],
@@ -162,7 +164,7 @@ export default class driveSyncPlugin extends Plugin {
 	deletingList: string[] = [];
 	statusBarItem = this.addStatusBarItem().createEl("span", "sync_icon_still");
 	pendingSync: boolean = false;
-	connectedToInternet: boolean = true;
+	connectedToInternet: boolean = false;
 	checkingForConnectivity: boolean = false;
 	pendingSyncItems: Array<pendingSyncItemInterface> = [];
 	renamedWhileOffline: Map<string, string> = new Map();
@@ -456,6 +458,27 @@ export default class driveSyncPlugin extends Plugin {
 				console.log("ERROR: Connectivity lost, not refreshing...");
 				return;
 			}
+			if (
+				new Date(this.settings.accessTokenExpiryTime).getTime() -
+					new Date().getTime() <
+				1800000
+				// half hour
+			) {
+				await this.writeToVerboseLogFile(
+					"LOG: Token will expire in 30mins, getting new token..."
+				);
+				var res: any = await getAccessToken(this.settings.refreshToken, false);
+				if (res == "error") {
+					new Notice("ERROR: Couldn't fetch new accessToken :(");
+					await this.writeToErrorLogFile(
+						new Error("ERROR: Couldn't fetch new accessToken")
+					);
+					return;
+				}
+				this.settings.accessToken = res.access_token;
+				this.settings.accessTokenExpiryTime = res.expiry_date;
+				this.saveSettings();
+			}
 			if (this.pendingSync) {
 				console.log("PAUSED: Writing pending syncs, not refreshing...");
 				if (!this.checkingForConnectivity) {
@@ -532,18 +555,37 @@ export default class driveSyncPlugin extends Plugin {
 					//console.log(id, dFile);
 
 					var file = await getFile(this.settings.accessToken, id);
-					await this.app.vault
-						.createBinary(file[0], file[1])
-						.catch(async () => {
-							var path = file[0]
-								.split("/")
-								.slice(0, -1)
-								.join("/");
-							//console.log(path);
+					try {
+						await this.app.vault.createBinary(file[0], file[1]);
+					} catch (err) {
+						await this.writeToVerboseLogFile(
+							"LOG: Couldn't create file directly, trying to create folder first..."
+						);
+						var path = file[0].split("/").slice(0, -1).join("/");
+						// console.log(path);
 
+						try {
 							await this.app.vault.createFolder(path);
+						} catch (err) {
+							if (err.message.includes("Folder already exists")) {
+								await this.writeToVerboseLogFile(
+									"LOG: Caught: Folder exists"
+								);
+							}
+						}
+						try {
 							await this.app.vault.createBinary(file[0], file[1]);
-						});
+						} catch (err) {
+							await this.writeToVerboseLogFile(
+								"LOG: Couldn't create file and folder, details of path, file[0]: " +
+									path +
+									", " +
+									file[0]
+							);
+							await this.writeToErrorLogFile(err);
+							await this.notifyError();
+						}
+					}
 					new Notice(
 						`Downloaded ${toDownload.indexOf(dFile) + 1}/${
 							toDownload.length
@@ -754,7 +796,12 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	checkAndEmptySyncQueue = async () => {
-		if (this.haltAllOperations) return;
+		if (
+			this.haltAllOperations ||
+			this.completingPendingSync ||
+			!this.connectedToInternet
+		)
+			return;
 		await this.writeToVerboseLogFile(
 			"LOG: Entering checkAndEmptySyncQueue"
 		);
@@ -921,24 +968,28 @@ export default class driveSyncPlugin extends Plugin {
 
 		let content: string;
 
-		if (errorLogFile instanceof TFile) {
-			content = !this.errorLoggingForTheFirstTimeInThisSession
-				? await this.app.vault.read(errorLogFile)
-				: "";
-			await this.app.vault.modify(
-				errorLogFile,
-				`${content}\n\n${new Date().toString()}-${log.name}-${
-					log.message
-				}-${log.stack}`
-			);
-			this.errorLoggingForTheFirstTimeInThisSession = false;
-		} else {
-			await this.app.vault.create(
-				ERROR_LOG_FILE_NAME,
-				`${new Date().toString()}-${log.name}-${log.message}-${
-					log.stack
-				}`
-			);
+		try {
+			if (errorLogFile instanceof TFile) {
+				content = !this.errorLoggingForTheFirstTimeInThisSession
+					? await this.app.vault.read(errorLogFile)
+					: "";
+				await this.app.vault.modify(
+					errorLogFile,
+					`${content}\n\n${new Date().toString()}-${log.name}-${
+						log.message
+					}-${log.stack}`
+				);
+				this.errorLoggingForTheFirstTimeInThisSession = false;
+			} else {
+				await this.app.vault.create(
+					ERROR_LOG_FILE_NAME,
+					`${new Date().toString()}-${log.name}-${log.message}-${
+						log.stack
+					}`
+				);
+			}
+		} catch (err) {
+			console.log(err);
 		}
 		await this.writeToVerboseLogFile("LOG: Exited writeToErrorLogFile");
 	};
@@ -1051,12 +1102,21 @@ export default class driveSyncPlugin extends Plugin {
 				break;
 			}
 		}
+		if (res == "network_error" && this.settings.vaultId) {
+			this.connectedToInternet = false;
+			new Notice("Recording offline changes...");
+			await this.writeToVerboseLogFile(
+				"NO CONNECTION: Swtiched to offline sync"
+			);
+		}
 
 		try {
 			if (res != "error" && res != "network_error") {
+				this.connectedToInternet = true;
 				await this.writeToVerboseLogFile("LOG: received accessToken");
 				// if accessToken is available
 				this.settings.accessToken = res.access_token;
+				this.settings.accessTokenExpiryTime = res.expiry_date;
 				this.settings.validToken = true;
 				var folders = await getFoldersList(this.settings.accessToken); // look for obsidian folder
 				var reqFolder = folders.filter(
@@ -1109,16 +1169,18 @@ export default class driveSyncPlugin extends Plugin {
 				);
 			} catch (err) {
 				await this.writeToErrorLogFile(err);
-				new Notice(
-					"FATAL ERROR: Couldn't get VaultID from Google Drive :("
-				);
-				await this.writeToVerboseLogFile(
-					"FATAL ERROR: Couldn't get VaultID from Google Drive :("
-				);
+				if (this.connectedToInternet && !this.settings.vaultId) {
+					new Notice(
+						"FATAL ERROR: Couldn't get VaultID from Google Drive :("
+					);
+					await this.writeToVerboseLogFile(
+						"FATAL ERROR: Couldn't get VaultID from Google Drive :("
+					);
+				}
 				new Notice("Check internet connection and restart plugin.");
 				await this.writeToVerboseLogFile("LOG: adding settings UI");
 				this.addSettingTab(new syncSettings(this.app, this));
-				return;
+				// return;
 			}
 			if (this.settings.vaultId == "NOT FOUND") {
 				await this.writeToVerboseLogFile("LOG: vault not found");
@@ -1134,7 +1196,11 @@ export default class driveSyncPlugin extends Plugin {
 			} else {
 				// if vault exists
 				this.settings.vaultInit = true;
-				await this.completeAllPendingSyncs();
+				if (this.connectedToInternet) {
+					await this.completeAllPendingSyncs();
+				} else {
+					this.checkForConnectivity();
+				}
 				await this.refreshAll();
 				this.registerInterval(
 					window.setInterval(async () => {
@@ -1147,6 +1213,9 @@ export default class driveSyncPlugin extends Plugin {
 					}, 1000)
 				);
 			}
+		} else {
+			new Notice("ERROR: Invalid token");
+			this.writeToErrorLogFile(new Error("ERROR: Invalid token"));
 		}
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
