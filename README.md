@@ -1,5 +1,11 @@
 # Obsidian Google Drive Sync Plugin
 
+![GitHub last commit](https://img.shields.io/github/last-commit/stravo1/obsidian-gdrive-sync)
+![GitHub Release Date](https://img.shields.io/github/release-date/stravo1/obsidian-gdrive-sync)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/stravo1/obsidian-gdrive-sync)
+[![Discord](https://img.shields.io/discord/1238748000344608788)](https://img.shields.io/discord/1238748000344608788?link=https%3A%2F%2Fdiscord.gg%2FdPasX4Ac2P)
+
+
 ## Overview
 
 The Obsidian Google Drive Sync Plugin is a plugin that allows you to seamlessly sync your notes across devices with Google Drive. It is a free alternative to the paid [Obsidian Sync](https://obsidian.md/sync) service. With just a few simple steps, you can enable auto sync and enjoy the convenience of accessing your notes from any device, be it mobile or dekstop, always up-to-date!
