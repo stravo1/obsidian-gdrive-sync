@@ -467,7 +467,10 @@ export default class driveSyncPlugin extends Plugin {
 				await this.writeToVerboseLogFile(
 					"LOG: Token will expire in 30mins, getting new token..."
 				);
-				var res: any = await getAccessToken(this.settings.refreshToken, false);
+				var res: any = await getAccessToken(
+					this.settings.refreshToken,
+					false
+				);
 				if (res == "error") {
 					new Notice("ERROR: Couldn't fetch new accessToken :(");
 					await this.writeToErrorLogFile(
@@ -524,13 +527,13 @@ export default class driveSyncPlugin extends Plugin {
 				) {
 					if (file.extension != "md") {
 						if (/-synced\.*/.test(file.path)) {
-							this.app.vault.delete(file);
+							this.app.vault.trash(file, false);
 							return;
 						}
 					}
 					var content = await this.app.vault.read(file);
 					if (driveDataPattern.test(content)) {
-						this.app.vault.delete(file);
+						this.app.vault.trash(file, false);
 					}
 				}
 			});
@@ -1656,7 +1659,11 @@ export default class driveSyncPlugin extends Plugin {
 				if (!this.cloudFiles.includes(file?.path!)) {
 					new ConfirmUpload(this.app, async () => {
 						// Called when the user clicks the icon.
-						this.uploadNewNotesFile(file);
+						if (file.extension != "md") {
+							await this.uploadNewAttachment(file);
+						} else {
+							await this.uploadNewNotesFile(file);
+						}
 					}).open();
 					return;
 				}
@@ -1729,7 +1736,11 @@ export default class driveSyncPlugin extends Plugin {
 				if (!this.cloudFiles.includes(file?.path!)) {
 					new ConfirmUpload(this.app, async () => {
 						// Called when the user clicks the icon.
-						this.uploadNewNotesFile(file);
+						if (file.extension != "md") {
+							await this.uploadNewAttachment(file);
+						} else {
+							await this.uploadNewNotesFile(file);
+						}
 					}).open();
 					return;
 				}
