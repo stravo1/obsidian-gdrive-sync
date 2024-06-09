@@ -1,5 +1,11 @@
 # Obsidian Google Drive Sync Plugin
 
+![GitHub last commit](https://img.shields.io/github/last-commit/stravo1/obsidian-gdrive-sync)
+![GitHub Release Date](https://img.shields.io/github/release-date/stravo1/obsidian-gdrive-sync)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/stravo1/obsidian-gdrive-sync)
+[![Discord](https://img.shields.io/discord/1238748000344608788)](https://img.shields.io/discord/1238748000344608788?link=https%3A%2F%2Fdiscord.gg%2FdPasX4Ac2P)
+
+
 ## Overview
 
 The Obsidian Google Drive Sync Plugin is a plugin that allows you to seamlessly sync your notes across devices with Google Drive. It is a free alternative to the paid [Obsidian Sync](https://obsidian.md/sync) service. With just a few simple steps, you can enable auto sync and enjoy the convenience of accessing your notes from any device, be it mobile or dekstop, always up-to-date!
@@ -54,7 +60,7 @@ Configuring the plugin is straightforward:
 #### Q. Does this plgin work for Android/iOS?  
 Yes it does! The entire purpose of this plugin is to make sure that you have access to your notes no matter where you are and what device you are using. So how to install the plugin on:  
 Android: it's exactly how you would install it on your desktop: download the latest release zip, extract it, copy the folder to `.obsidian/plugins` under the location where you chose to create the vault. Here's a [video walkthrough](https://github.com/stravo1/obsidian-gdrive-sync/issues/4#issuecomment-2022138355).  
-iOS: There's not a conventional way of installing these unofficial plugins on your iOS devices. The only option as of now is to create the vault, install the plugin and copy over the entire vault from desktop to the iOS device. If you have installed the plugin in an existing vault, you can copy over the vault as is. Here's some links: [Github comment](https://github.com/stravo1/obsidian-gdrive-sync/issues/12#issuecomment-2028541154) - [Reddit Thread](https://www.reddit.com/r/ObsidianMD/comments/p9evrs/manually_install_plugins_on_ios/)
+iOS: There's not a conventional way of installing these unofficial plugins on your iOS devices. The only option as of now is to create the vault, install the plugin and copy over the entire vault from desktop to the iOS device. If you have installed the plugin in an existing vault, you can copy over the vault as is. Here's some links: [Github comment](https://github.com/stravo1/obsidian-gdrive-sync/issues/12#issuecomment-2146264456) - [Reddit Thread](https://www.reddit.com/r/ObsidianMD/comments/p9evrs/manually_install_plugins_on_ios/)
   
 #### Q. What's the `lastSync: ...` thing under properties/tags?  
 The plugin keeps track of the last time the file was synced on a particular device using a "property" or YAML tag named `lastSync`. This keeps changing as the note is continuously synced. Please refrain from editing that tag. [Read more](https://github.com/stravo1/obsidian-gdrive-sync/issues/9#issuecomment-2026540794)
