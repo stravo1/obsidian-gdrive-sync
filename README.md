@@ -32,7 +32,7 @@ To install the Obsidian Google Drive Auto Sync Plugin, follow these steps (if yo
 
 1. Download the "obsidian-gdrive-sync.zip" from the [latest release](https://github.com/stravo1/obsidian-gdrive-sync/releases) and unzip it. After unzipping you should have a folder named "obsidian-gdrive-sync" containing 3 files. If after unzipping you end up with 3 different files (main.js, styles.css, manifest.json), place them under a new folder called "obsidian-gdrive-sync".
 
-2. Navigate to your vault's location. Open the `.obsidian` folder (Turn on "Show Hidden Files and Folders" in your file manager if this folder is not visible). Go to `plugins` (You might have to create this folder if you never installed any plugin before). Paste the folder containing 3 files. The pah to the plugin should look like this: `/$PATH_TO_VAULT/.obsidian/plugins/obsidian-gdrive-sync`
+2. Navigate to your vault's location. Open the `.obsidian` folder (Turn on "Show Hidden Files and Folders" in your file manager if this folder is not visible). Go to `plugins` (You might have to create this folder if you never installed any plugin before). Paste the folder containing 3 files. The path to the plugin should look like this: `/$PATH_TO_VAULT/.obsidian/plugins/obsidian-gdrive-sync`
 
 3. Open the required vault in Obsidian. Enable **Community Plugins** under Settings (If you are opening the vault for the first time you might be asked to confirm to "Trust Author and Enable Plugin", click to enable it). 
 
