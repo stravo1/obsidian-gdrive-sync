@@ -6,6 +6,7 @@ import {
 	PluginSettingTab,
 	setIcon,
 	Setting,
+	TAbstractFile,
 	TFile,
 } from "obsidian";
 
@@ -116,6 +117,7 @@ interface driveValues {
 	autoRefreshBinaryFiles: string;
 	errorLoggingToFile: boolean;
 	verboseLoggingToFile: boolean;
+	blacklistPaths: string[];
 	//writingFile: boolean;
 	//syncQueue: boolean;
 }
@@ -134,6 +136,7 @@ const DEFAULT_SETTINGS: driveValues = {
 	autoRefreshBinaryFiles: "0",
 	errorLoggingToFile: false,
 	verboseLoggingToFile: false,
+	blacklistPaths: [],
 	//writingFile: false,
 	//syncQueue: false,
 };
@@ -820,6 +823,11 @@ export default class driveSyncPlugin extends Plugin {
 		if (this.haltAllOperations) {
 			return;
 		}
+		if (this.isInBlacklist(e)) {
+			new Notice(
+				"File is listed in blacklist. It will be uploaded but not be tracked by the plugin automatically."
+			);
+		}
 		try {
 			await this.writeToVerboseLogFile(
 				"LOG: Entering uploadNewAttachment"
@@ -1027,6 +1035,13 @@ export default class driveSyncPlugin extends Plugin {
 		}
 	};
 
+	isInBlacklist = (file: TAbstractFile) => {
+		for (const path of this.settings.blacklistPaths) {
+			if (file.path.includes(path)) return true;
+		}
+		return false;
+	};
+
 	async onload() {
 		await this.loadSettings();
 
@@ -1204,7 +1219,7 @@ export default class driveSyncPlugin extends Plugin {
 				} else {
 					this.checkForConnectivity();
 				}
-				await this.refreshAll();
+				this.refreshAll();
 				this.registerInterval(
 					window.setInterval(async () => {
 						this.refreshAll();
@@ -1237,6 +1252,9 @@ export default class driveSyncPlugin extends Plugin {
 		this.registerEvent(
 			this.app.vault.on("rename", async (newFile, oldpath) => {
 				if (ignoreFiles.includes(newFile.path)) {
+					return;
+				}
+				if (this.isInBlacklist(newFile)) {
 					return;
 				}
 				if (this.completingPendingSync) {
@@ -1363,6 +1381,9 @@ export default class driveSyncPlugin extends Plugin {
 				if (ignoreFiles.includes(e.path)) {
 					return;
 				}
+				if (this.isInBlacklist(e)) {
+					return;
+				}
 				if (this.completingPendingSync) {
 					await this.writeToVerboseLogFile(
 						"LOG: not uploading as pending sync is ongoing"
@@ -1417,6 +1438,9 @@ export default class driveSyncPlugin extends Plugin {
 		this.registerEvent(
 			this.app.vault.on("delete", async (e) => {
 				if (ignoreFiles.includes(e.path)) {
+					return;
+				}
+				if (this.isInBlacklist(e)) {
 					return;
 				}
 				if (this.completingPendingSync) {
@@ -1488,6 +1512,9 @@ export default class driveSyncPlugin extends Plugin {
 		this.registerEvent(
 			this.app.vault.on("modify", async (e) => {
 				if (ignoreFiles.includes(e.path)) {
+					return;
+				}
+				if (this.isInBlacklist(e)) {
 					return;
 				}
 				if (this.completingPendingSync) {
@@ -2028,6 +2055,16 @@ class syncSettings extends PluginSettingTab {
 					new Notice("Sync complete :)");
 				})
 			);
+		new Setting(containerEl)
+			.setName("Blacklist paths")
+			.setDesc(
+				"Add names for folders and files which should not be tracked by the plugin separated by comma. Example: templateFolder,dailyTemplateNote,file1,folder1 . NOTE: If folder name(s) is(are) mentioned, all files and folders under the mentioned folder would also be ignored."
+			)
+			.addTextArea((textArea) => {
+				textArea.onChange((value) => {
+					this.plugin.settings.blacklistPaths = value.split(",");
+				});
+			});
 	}
 }
 
