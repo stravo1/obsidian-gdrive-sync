@@ -1434,10 +1434,8 @@ export default class driveSyncPlugin extends Plugin {
 											/\//g,
 											"."
 										);
-										let newSafeFilename = newFile.path.replace(
-											/\//g,
-											"."
-										);
+										let newSafeFilename =
+											newFile.path.replace(/\//g, ".");
 										await this.adapter.remove(
 											`${ATTACHMENT_TRACKING_FOLDER_NAME}/${oldSafeFilename}`
 										);
@@ -1563,7 +1561,10 @@ export default class driveSyncPlugin extends Plugin {
 						await this.writeToVerboseLogFile(
 							"LOG: Connectivity lost, not uploading files to Google Drive"
 						);
-						if (e instanceof TFile && !/-synced\.*/.test(e.path)) {
+						if (
+							e instanceof TFile &&
+							!this.cloudFiles.includes(e.path)
+						) {
 							if (e.extension != "md") {
 								await this.writeToVerboseLogFile(
 									"LOG: created attachment while offline"
@@ -1584,7 +1585,10 @@ export default class driveSyncPlugin extends Plugin {
 						return;
 					}
 
-					if (e instanceof TFile && !/-synced\.*/.test(e.path)) {
+					if (
+						e instanceof TFile &&
+						!this.cloudFiles.includes(e.path)
+					) {
 						if (e.extension != "md") {
 							await this.writeToVerboseLogFile(
 								"LOG: created attachment while online"
@@ -1614,11 +1618,8 @@ export default class driveSyncPlugin extends Plugin {
 					);
 					return;
 				}
-				
-				let convertedSafeFilename = e.path.replace(
-					/\//g,
-					"."
-				);
+
+				let convertedSafeFilename = e.path.replace(/\//g, ".");
 				try {
 					await this.adapter.remove(
 						`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
