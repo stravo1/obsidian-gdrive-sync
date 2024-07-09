@@ -1427,6 +1427,35 @@ export default class driveSyncPlugin extends Plugin {
 							this.renamedWhileOffline.set(newFile.path, id!);
 							this.renamedWhileOffline.delete(oldpath);
 							this.finalNamesForFileID.set(id!, newFile.path);
+							if (newFile instanceof TFile) {
+								if (newFile.extension != "md") {
+									try {
+										let oldSafeFilename = oldpath.replace(
+											/\//g,
+											"."
+										);
+										let newSafeFilename = newFile.path.replace(
+											/\//g,
+											"."
+										);
+										await this.adapter.remove(
+											`${ATTACHMENT_TRACKING_FOLDER_NAME}/${oldSafeFilename}`
+										);
+										await this.app.vault.create(
+											`${ATTACHMENT_TRACKING_FOLDER_NAME}/${newSafeFilename}`,
+											""
+										);
+									} catch (err) {
+										await this.writeToVerboseLogFile(
+											`LOG: ${ATTACHMENT_TRACKING_FOLDER_NAME}/${oldpath.replace(
+												/\//g,
+												"."
+											)} could not be renamed`
+										);
+										await this.writeToErrorLogFile(err);
+									}
+								}
+							}
 						}
 						await this.writeToPendingSyncFile();
 						return;
@@ -1584,6 +1613,22 @@ export default class driveSyncPlugin extends Plugin {
 						"LOG: not deleting as pending sync is ongoing"
 					);
 					return;
+				}
+				
+				let convertedSafeFilename = e.path.replace(
+					/\//g,
+					"."
+				);
+				try {
+					await this.adapter.remove(
+						`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+					);
+				} catch (err) {
+					await this.writeToErrorLogFile(err);
+					await this.writeToVerboseLogFile(
+						"LOG: Could not delete " +
+							`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+					);
 				}
 
 				try {
