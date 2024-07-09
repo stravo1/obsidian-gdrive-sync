@@ -660,7 +660,9 @@ export default class driveSyncPlugin extends Plugin {
 						);
 					} catch (err) {
 						if (err.message.includes("exist")) {
-							await this.writeToVerboseLogFile("Already tracked: " + file);
+							await this.writeToVerboseLogFile(
+								"LOG: Already tracked: " + file
+							);
 						} else {
 							await this.writeToErrorLogFile(err);
 							await this.writeToVerboseLogFile(
@@ -1462,6 +1464,35 @@ export default class driveSyncPlugin extends Plugin {
 						id,
 						newFile.path
 					);
+					if (newFile instanceof TFile) {
+						if (newFile.extension != "md") {
+							try {
+								let oldSafeFilename = oldpath.replace(
+									/\//g,
+									"."
+								);
+								let newSafeFilename = newFile.path.replace(
+									/\//g,
+									"."
+								);
+								await this.adapter.remove(
+									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${oldSafeFilename}`
+								);
+								await this.app.vault.create(
+									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${newSafeFilename}`,
+									""
+								);
+							} catch (err) {
+								await this.writeToVerboseLogFile(
+									`LOG: ${ATTACHMENT_TRACKING_FOLDER_NAME}/${oldpath.replace(
+										/\//g,
+										"."
+									)} could not be renamed`
+								);
+								await this.writeToErrorLogFile(err);
+							}
+						}
+					}
 					new Notice("Files/Folders renamed!");
 
 					this.renamingList.splice(
