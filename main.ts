@@ -8,6 +8,7 @@ import {
 	Setting,
 	TAbstractFile,
 	TFile,
+	FileSystemAdapter,
 } from "obsidian";
 
 import axios from "axios";
@@ -28,6 +29,8 @@ import {
 const PENDING_SYNC_FILE_NAME = "pendingSync-gdrive-plugin";
 const ERROR_LOG_FILE_NAME = "error-log-gdrive-plugin.md";
 const VERBOSE_LOG_FILE_NAME = "verbose-log-gdrive-plugin.md";
+const ATTACHMENT_TRACKING_FOLDER_NAME =
+	".attachment-tracking-obsidian-gdrive-sync";
 
 const ignoreFiles = [
 	PENDING_SYNC_FILE_NAME,
@@ -178,6 +181,7 @@ export default class driveSyncPlugin extends Plugin {
 	lastErrorTime: Date = new Date(0);
 	totalErrorsWithinAMinute: number = 0;
 	haltAllOperations: boolean = false;
+	adapter: FileSystemAdapter;
 
 	completeAllPendingSyncs = async () => {
 		if (this.haltAllOperations) {
@@ -529,8 +533,27 @@ export default class driveSyncPlugin extends Plugin {
 					file.path != this.currentlyUploading
 				) {
 					if (file.extension != "md") {
-						if (/-synced\.*/.test(file.path)) {
+						if (await this.isAttachmentSynced(file.path)) {
 							this.app.vault.trash(file, false);
+							let convertedSafeFilename = file.path.replace(
+								/\//g,
+								"."
+							);
+							try {
+								await this.adapter.remove(
+									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+								);
+							} catch (err) {
+								await this.writeToErrorLogFile(err);
+								await this.writeToVerboseLogFile(
+									"Could not delete " +
+										`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+								);
+								console.log(
+									"Could not delete " +
+										`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+								);
+							}
 							return;
 						}
 					}
@@ -561,8 +584,29 @@ export default class driveSyncPlugin extends Plugin {
 					//console.log(id, dFile);
 
 					var file = await getFile(this.settings.accessToken, id);
+					let isBinary =
+						file[0].split(".")[file[0].split(".").length - 1] !=
+						"md";
 					try {
 						await this.app.vault.createBinary(file[0], file[1]);
+						if (isBinary) {
+							let safeFilename = file[0].replace(/\//g, ".");
+							try {
+								await this.app.vault.create(
+									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${safeFilename}`,
+									""
+								);
+							} catch (err) {
+								console.log(
+									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${safeFilename} could not be created`,
+									err
+								);
+								await this.writeToVerboseLogFile(
+									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${safeFilename} could not be created`
+								);
+								await this.writeToErrorLogFile(err);
+							}
+						}
 					} catch (err) {
 						await this.writeToVerboseLogFile(
 							"LOG: Couldn't create file directly, trying to create folder first..."
@@ -620,6 +664,11 @@ export default class driveSyncPlugin extends Plugin {
 	uploadNewNotesFile = async (newFile: TFile) => {
 		if (this.haltAllOperations) {
 			return;
+		}
+		if (this.isInBlacklist(newFile)) {
+			new Notice(
+				"File in blacklist. It will be uploaded but not be synced/tracked automatically by the plugin."
+			);
 		}
 		try {
 			await this.writeToVerboseLogFile(
@@ -834,32 +883,45 @@ export default class driveSyncPlugin extends Plugin {
 			);
 			new Notice("Uploading new attachment!");
 			var buffer: any = await this.app.vault.readBinary(e);
-			const fileExtensionPattern = /\..*/;
-			var newFileName = e.path.replace(
-				fileExtensionPattern,
-				"-synced" + e.path.match(fileExtensionPattern)![0]
-			);
 
-			this.currentlyUploading = newFileName;
+			this.currentlyUploading = e.path;
 
-			await this.app.vault.rename(e, newFileName);
+			this.cloudFiles.push(e.path);
+			try {
+				await this.app.vault.create(
+					`${ATTACHMENT_TRACKING_FOLDER_NAME}/${e.path.replace(
+						/\//g,
+						"."
+					)}`,
+					""
+				);
+			} catch (err) {
+				await this.writeToErrorLogFile(err);
+				await this.writeToVerboseLogFile(
+					"LOG: Could not create attachment tracking file: " +
+						`${ATTACHMENT_TRACKING_FOLDER_NAME}/${e.path.replace(
+							/\//g,
+							"."
+						)}`
+				);
+				console.log(
+					"Could not create attachment tracking file: " +
+						`${ATTACHMENT_TRACKING_FOLDER_NAME}/${e.path.replace(
+							/\//g,
+							"."
+						)}`
+				);
+			}
 
-			this.cloudFiles.push(newFileName);
 			let id = await uploadFile(
 				this.settings.accessToken,
-				newFileName,
+				e.path,
 				buffer,
 				this.settings.vaultId
 			);
 
 			this.currentlyUploading = null;
 			new Notice("Uploaded!");
-
-			new Notice(
-				"Please make sure that all links to this attachment are updated with the new name: " +
-					newFileName,
-				5000
-			);
 			return id;
 		} catch (err) {
 			await this.notifyError();
@@ -1042,7 +1104,20 @@ export default class driveSyncPlugin extends Plugin {
 		return false;
 	};
 
+	isAttachmentSynced = async (filename: string) => {
+		const attachmentsAlreadySynced = (
+			await this.adapter.list(ATTACHMENT_TRACKING_FOLDER_NAME)
+		).files;
+		const convertedSafeFilename = filename.replace(/\//g, ".");
+
+		for (const attachment of attachmentsAlreadySynced) {
+			if (attachment.includes(convertedSafeFilename)) return true;
+		}
+		return false;
+	};
+
 	async onload() {
+		this.adapter = this.app.vault.adapter as FileSystemAdapter;
 		await this.loadSettings();
 
 		await this.writeToVerboseLogFile("LOG: getAccessToken");
@@ -1218,6 +1293,21 @@ export default class driveSyncPlugin extends Plugin {
 					await this.completeAllPendingSyncs();
 				} else {
 					this.checkForConnectivity();
+				}
+				try {
+					await this.app.vault.createFolder(
+						ATTACHMENT_TRACKING_FOLDER_NAME
+					);
+				} catch (err) {
+					if (err.message.includes("exist")) {
+						console.log("It's fine, folder exists.");
+					} else {
+						new Notice(
+							"FATAL ERROR: Could not create folder for tracking attachments!"
+						);
+						await this.writeToErrorLogFile(err);
+						// this.haltAllOperations = true;
+					}
 				}
 				this.refreshAll();
 				this.registerInterval(
