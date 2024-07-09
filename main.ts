@@ -182,6 +182,7 @@ export default class driveSyncPlugin extends Plugin {
 	totalErrorsWithinAMinute: number = 0;
 	haltAllOperations: boolean = false;
 	adapter: FileSystemAdapter;
+	attachmentTrackingInitializationComplete: boolean = false;
 
 	completeAllPendingSyncs = async () => {
 		if (this.haltAllOperations) {
@@ -546,11 +547,7 @@ export default class driveSyncPlugin extends Plugin {
 							} catch (err) {
 								await this.writeToErrorLogFile(err);
 								await this.writeToVerboseLogFile(
-									"Could not delete " +
-										`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
-								);
-								console.log(
-									"Could not delete " +
+									"LOG: Could not delete " +
 										`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
 								);
 							}
@@ -597,12 +594,8 @@ export default class driveSyncPlugin extends Plugin {
 									""
 								);
 							} catch (err) {
-								console.log(
-									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${safeFilename} could not be created`,
-									err
-								);
 								await this.writeToVerboseLogFile(
-									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${safeFilename} could not be created`
+									`LOG: ${ATTACHMENT_TRACKING_FOLDER_NAME}/${safeFilename} could not be created`
 								);
 								await this.writeToErrorLogFile(err);
 							}
@@ -648,7 +641,36 @@ export default class driveSyncPlugin extends Plugin {
 				// 	"Sorry to make you wait for so long. Please continue with your work",
 				// 	5000
 				// );
+
 				this.settings.refresh = false;
+			}
+			if (!this.attachmentTrackingInitializationComplete) {
+				console.log("Initializing attachment tracking...");
+				for (const file of this.cloudFiles) {
+					if (file.slice(-3) == ".md") {
+						continue;
+					}
+					console.log("Creating attachment tracking file: " + file);
+
+					let convertedSafeFilename = file.replace(/\//g, ".");
+					try {
+						await this.app.vault.create(
+							`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`,
+							""
+						);
+					} catch (err) {
+						if (err.message.includes("exist")) {
+							await this.writeToVerboseLogFile("Already tracked: " + file);
+						} else {
+							await this.writeToErrorLogFile(err);
+							await this.writeToVerboseLogFile(
+								"LOG: Could not create " +
+									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+							);
+						}
+					}
+				}
+				this.attachmentTrackingInitializationComplete = true;
 			}
 			this.getLatestContent(this.app.workspace.getActiveFile()!);
 			this.alreadyRefreshing = false;
@@ -899,13 +921,6 @@ export default class driveSyncPlugin extends Plugin {
 				await this.writeToErrorLogFile(err);
 				await this.writeToVerboseLogFile(
 					"LOG: Could not create attachment tracking file: " +
-						`${ATTACHMENT_TRACKING_FOLDER_NAME}/${e.path.replace(
-							/\//g,
-							"."
-						)}`
-				);
-				console.log(
-					"Could not create attachment tracking file: " +
 						`${ATTACHMENT_TRACKING_FOLDER_NAME}/${e.path.replace(
 							/\//g,
 							"."
