@@ -12,7 +12,7 @@ The Obsidian Google Drive Sync Plugin is a plugin that allows you to seamlessly 
 
 This plugin is designed to be easy to install and configure compared to other plugins, no need to tackle git repos or manage Google Cloud Projects or setup any other external app.
 
-> ⚠️ The plugin is under active development, new releases might introduce bugs, old releases maybe be incompatible with the new ones. This might lead to data loss. Some workarounds (like [this](#q-why-are-my-attachments-being-renamed)) being used might create more problems. So please create a BACKUP of your vault before you install and try this plugin.
+> ⚠️ The plugin is under active development, new releases might introduce bugs, old releases maybe be incompatible with the new ones. This might lead to data loss. Do read the [FAQs](#faqs) before trying out the plugin. Please create a BACKUP of your vault before you install and try this plugin.
 
 ## Features
 
@@ -65,8 +65,17 @@ iOS: There's not a conventional way of installing these unofficial plugins on yo
 #### Q. What's the `lastSync: ...` thing under properties/tags?  
 The plugin keeps track of the last time the file was synced on a particular device using a "property" or YAML tag named `lastSync`. This keeps changing as the note is continuously synced. Please refrain from editing that tag. [Read more](https://github.com/stravo1/obsidian-gdrive-sync/issues/9#issuecomment-2026540794)
   
-#### Q. Why are my attachments being renamed?  
-The attachments are renamed when they are uploaded because unlike in notes there's no "lastSync" tag that the plug-in can read from the note's content, so to differentiate between which attachments are synced and which are not it's renamed to "attachment_name-synced". I am actively trying to create a workaround for this, but it will take time.  
+#### ~Q. Why are my attachments being renamed?~ (SOLVED after [beta-13](https://github.com/stravo1/obsidian-gdrive-sync/releases/tag/v0.9.9-beta-13))  
+If you are using a release older then beta-13 then the plugin renames the attachment to keep track of it: the attachments are renamed when they are uploaded because unlike in notes there's no "lastSync" tag that the plug-in can read from the note's content, so to differentiate between which attachments are synced and which are not it's renamed to "attachment_name-synced". I am actively trying to create a workaround for this, but it will take time. After [beta-13](https://github.com/stravo1/obsidian-gdrive-sync/releases/tag/v0.9.9-beta-13) this is no more the case (read release notes).
+
+#### Q. Can I manually add files in Drive? / Does the plug-in track files manually added to the Drive folder? / Can I import files manually to the Drive folder?  
+Unfortunately no, for security reasons the plug-in has access to only those files that _it creates_, and it has been made such that all vaults stay under the "obsidian" folder in Drive, and it can only access those files that it has created under that folder to make sure that it is not tampering/reading other sensitive files that the user might have. Here's some techincal details: `.../auth/drive.appdata` and `...auth/drive.file` are the scopes the plug-in has access to.
+
+#### Q. What about security and privacy?  
+The plug-in has limited access to only those files it creates itself, so it can't read any other files on your Drive. While giving the plug-in the necessary permissions you can confirm it yourself. And as for the token exchange part a server has to be unfortunately involved. I have a server hosted (whose link is the LogIn link) which does the code exchange for you, you can however implement your own Google Cloud Project and retrieve the refresh token. The plug-in just requires the refresh token to work, how it ia retrieved is nonr of it's concern. More info at: https://github.com/stravo1/obsidian-gdrive-sync/issues/12#issuecomment-2146264456
+
+#### Q. Notes created from templates get deleted automatically. How to solve it?  
+The plug-in uses the "lastSync" tag to keep track of synced files. So if a new note having the "lastSync" tag of the template from which it was created is detected by the plug-in it assumes that this "new" note was already synced as it has the "lastSync" tag (which is not true as it got the tag from the template) and as it can't find this "new" note on Drive (of cource it can't, it was never uploaded) it deletes the note to keep it in sync with Drive. Solution is to add the name of the template note/folder containing templates under the Blacklist option in settings and remove the "lastSync" tag from the template note(s) if it(they) has(have) the tag.
   
 #### Q. Does the vault need to have the same name across devices?  
 A. Yes! The plug-in can be used to sync multiple vaults, and it uses the vault name to identify which vault is being currently worked on and need to be synced, you need to keep the vault name same across devices so that changes made under "sample-vault" on one device appears under "sample-vault" on your other devices as well.  
@@ -79,12 +88,10 @@ A. It is very much in beta and not ready for "public" release, and will require 
 If you encounter any issues with the plugin, check the following:
 
 - Ensure that the plugin has been properly installed.
-
 - Ensure that the refresh token has been properly copied and pasted.
-
 - Ensure you have a good internet connection.
-
 - Check for any error messages in the Obsidian console and report the same by [creating an issue on GitHub](https://github.com/stravo1/obsidian-gdrive-sync/issues).
+- Attach Error Logs and Verbose Logs while creating an issue. You can enable logging in settings.
 
 
 If you need assistance or have questions, feel free to reach out by [creating an issue on GitHub](https://github.com/stravo1/obsidian-gdrive-sync/issues) or you can also [join the discord server](https://discord.com/invite/dPasX4Ac2P).
