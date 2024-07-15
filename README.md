@@ -100,6 +100,16 @@ If you need assistance or have questions, feel free to reach out by [creating an
 
 If you have suggestions, encounter issues, or want to contribute to its development, please visit our [GitHub repository](https://github.com/stravo1/obsidian-gdrive-sync) and create an issue or pull request or you can also [join the discord server](https://discord.com/invite/dPasX4Ac2P).
 
+## Star History
+
+<a href="https://star-history.com/#stravo1/obsidian-gdrive-sync&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=stravo1/obsidian-gdrive-sync&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=stravo1/obsidian-gdrive-sync&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=stravo1/obsidian-gdrive-sync&type=Date" />
+ </picture>
+</a>
+
 ---
 
 Happy syncing!
