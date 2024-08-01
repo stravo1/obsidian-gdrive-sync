@@ -520,7 +520,8 @@ export default class driveSyncPlugin extends Plugin {
 				(file) =>
 					!this.localFiles.includes(file) && // is not currently in vault
 					!this.renamingList.includes(file) && // is not currently being renamed
-					!this.deletingList.includes(file) // is not currently being deleted
+					!this.deletingList.includes(file) && // is not currently being deleted
+					!this.isInBlacklist(file) // is not in blacklist
 			);
 
 			await this.writeToVerboseLogFile(
@@ -531,6 +532,7 @@ export default class driveSyncPlugin extends Plugin {
 				if (
 					!this.cloudFiles.includes(file.path) &&
 					!this.renamingList.includes(file.path) &&
+					!this.deletingList.includes(file.path) &&
 					file.path != this.currentlyUploading
 				) {
 					if (file.extension != "md") {
@@ -1114,7 +1116,13 @@ export default class driveSyncPlugin extends Plugin {
 		}
 	};
 
-	isInBlacklist = (file: TAbstractFile) => {
+	isInBlacklist = (file: TAbstractFile | string) => {
+		if (typeof file === "string") {
+			for (const path of this.settings.blacklistPaths) {
+				if (file.includes(path)) return true;
+			}
+			return false;
+		}
 		for (const path of this.settings.blacklistPaths) {
 			if (file.path.includes(path)) return true;
 		}
@@ -1609,9 +1617,9 @@ export default class driveSyncPlugin extends Plugin {
 				if (ignoreFiles.includes(e.path)) {
 					return;
 				}
-				if (this.isInBlacklist(e)) {
-					return;
-				}
+				// if (this.isInBlacklist(e)) {
+				// 	return;
+				// }
 				if (this.completingPendingSync) {
 					await this.writeToVerboseLogFile(
 						"LOG: not deleting as pending sync is ongoing"
@@ -2243,7 +2251,9 @@ class syncSettings extends PluginSettingTab {
 				"Add names for folders and files which should not be tracked by the plugin separated by comma. Example: templateFolder,dailyTemplateNote,file1,folder1 . NOTE: If folder name(s) is(are) mentioned, all files and folders under the mentioned folder would also be ignored."
 			)
 			.addTextArea((textArea) => {
-				textArea.onChange((value) => {
+				textArea
+					.setValue(this.plugin.settings.blacklistPaths.join(","))
+					.onChange((value) => {
 					this.plugin.settings.blacklistPaths = value.split(",");
 				});
 			});
