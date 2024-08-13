@@ -12,7 +12,7 @@ The Obsidian Google Drive Sync Plugin is a plugin that allows you to seamlessly 
 
 This plugin is designed to be easy to install and configure compared to other plugins, no need to tackle git repos or manage Google Cloud Projects or setup any other external app.
 
-> ⚠️ The plugin is under active development, new releases might introduce bugs, old releases maybe be incompatible with the new ones. This might lead to data loss. Do read the [FAQs](#faqs) before trying out the plugin. Please create a BACKUP of your vault before you install and try this plugin.
+> ⚠️ The plugin is under active development, new releases might introduce bugs, old releases maybe be incompatible with the new ones. This might lead to data loss. Do read the [FAQs](#faqs) before trying out the plugin. Please create a BACKUP of your vault before you install and try this plugin. The plug-in is not optimised for vault having more than 1k files, working on optimization for large vaults.
 
 ## Features
 
