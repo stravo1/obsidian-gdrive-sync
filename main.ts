@@ -789,6 +789,7 @@ export default class driveSyncPlugin extends Plugin {
 
 				if (file.extension != "md") {
 					isBinaryFile = true;
+					timeStamp = [file.stat.mtime];
 				} else {
 					content = await this.app.vault.cachedRead(file!);
 					timeStamp = content.match(/lastSync:.*/);
@@ -799,11 +800,13 @@ export default class driveSyncPlugin extends Plugin {
 				if (
 					forced == "forced" ||
 					(isBinaryFile &&
-						parseInt(this.settings.autoRefreshBinaryFiles)) ||
-					(timeStamp /* check if timeStamp is present */ &&
+						parseInt(this.settings.autoRefreshBinaryFiles) &&
+						timeStamp /* check if timeStamp is present */ &&
 						cloudDate.getTime() >
 							new Date(timeStamp![0]).getTime() +
-								3000) /* allow 3sec delay in 'localDate' */
+								(isBinaryFile
+									? 5000
+									: 3000)) /* allow 3sec/5sec (needs to be tested) delay in 'localDate' */
 				) {
 					// new Notice("Downloading updated file!");
 					var id;
@@ -813,11 +816,11 @@ export default class driveSyncPlugin extends Plugin {
 						}
 					});
 					var res = await getFile(this.settings.accessToken, id);
-					console.log("here", this.writingFile);
+					// console.log("here", this.writingFile, res);
 
 					if (
 						this.syncQueue.length ||
-						isBinaryFile ||
+						// isBinaryFile ||
 						this.writingFile
 					)
 						return;
@@ -864,10 +867,10 @@ export default class driveSyncPlugin extends Plugin {
 				id = f.id;
 			}
 		});
-
-		await this.updateLastSyncMetaTag(file);
+		if (file.extension == "md") await this.updateLastSyncMetaTag(file);
 		var buffer = await this.app.vault.readBinary(file);
 		await modifyFile(this.settings.accessToken, id, buffer);
+		await this.refreshFilesListInDriveAndStoreInSettings();
 
 		this.statusBarItem.classList.replace("sync_icon", "sync_icon_still");
 		setIcon(this.statusBarItem, "checkmark");
@@ -1796,9 +1799,8 @@ export default class driveSyncPlugin extends Plugin {
 					setIcon(this.statusBarItem, "sync");
 					if (this.timer) clearTimeout(this.timer);
 					this.timer = setTimeout(async () => {
-						if (e instanceof TFile && e.extension == "md") {
+						if (e instanceof TFile) {
 							var buffer = await this.app.vault.readBinary(e);
-
 							if (
 								this.latestContentThatWasSynced != null &&
 								bufferEqual(
@@ -1818,7 +1820,10 @@ export default class driveSyncPlugin extends Plugin {
 								return;
 							}
 							let content = await this.app.vault.cachedRead(e);
-							let timeStamp = content.match(/lastSync:.*/);
+							let timeStamp =
+								e.extension == "md"
+									? content.match(/lastSync:.*/)
+									: false;
 							if (timeStamp) {
 								if (
 									Math.abs(
@@ -1839,12 +1844,13 @@ export default class driveSyncPlugin extends Plugin {
 									return;
 								}
 							}
-							if (this.syncQueue.contains(e.path)) return;
-							else this.syncQueue.push(e.path);
-							await this.writeToVerboseLogFile(
-								"LOG: modifying file while online"
-							);
 						}
+
+						if (this.syncQueue.contains(e.path)) return;
+						else this.syncQueue.push(e.path);
+						await this.writeToVerboseLogFile(
+							"LOG: modifying file while online"
+						);
 						this.writingFile = false;
 					}, 2500);
 				} catch (err) {
@@ -2254,8 +2260,8 @@ class syncSettings extends PluginSettingTab {
 				textArea
 					.setValue(this.plugin.settings.blacklistPaths.join(","))
 					.onChange((value) => {
-					this.plugin.settings.blacklistPaths = value.split(",");
-				});
+						this.plugin.settings.blacklistPaths = value.split(",");
+					});
 			});
 	}
 }
