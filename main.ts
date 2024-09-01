@@ -136,7 +136,7 @@ const DEFAULT_SETTINGS: driveValues = {
 	rootFolderId: "",
 	refresh: false,
 	refreshTime: "5",
-	autoRefreshBinaryFiles: "0",
+	autoRefreshBinaryFiles: "1",
 	errorLoggingToFile: false,
 	verboseLoggingToFile: false,
 	blacklistPaths: [],
@@ -799,15 +799,19 @@ export default class driveSyncPlugin extends Plugin {
 
 				if (
 					forced == "forced" ||
-					(isBinaryFile &&
-						parseInt(this.settings.autoRefreshBinaryFiles) &&
-						timeStamp /* check if timeStamp is present */ &&
+					(timeStamp /* check if timeStamp is present */ &&
 						cloudDate.getTime() >
 							new Date(timeStamp![0]).getTime() +
 								(isBinaryFile
 									? 5000
 									: 3000)) /* allow 3sec/5sec (needs to be tested) delay in 'localDate' */
 				) {
+					if (
+						isBinaryFile &&
+						!parseInt(this.settings.autoRefreshBinaryFiles)
+					) {
+						return;
+					}
 					// new Notice("Downloading updated file!");
 					var id;
 					this.settings.filesList.map((fileItem: any) => {
