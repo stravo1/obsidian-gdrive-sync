@@ -54,7 +54,9 @@ Configuring the plugin is straightforward:
 
 5. Once the previous steps are complete, set your preferred synchronization interval.
 
-6. Enjoy auto sync, for free!
+6. On other devices, create a vault with the same name, install the plug-in and log-in. The plug-in should detect that a vault with the same name as the current one has been synced and uploaded to Drive and should download all the files.
+
+7. That's it! Enjoy auto sync :)
 
 ## FAQs
 #### Q. Does this plgin work for Android/iOS?  
