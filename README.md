@@ -1,10 +1,11 @@
 # Obsidian Google Drive Sync Plugin
 
-![GitHub last commit](https://img.shields.io/github/last-commit/stravo1/obsidian-gdrive-sync)
-![GitHub Release Date](https://img.shields.io/github/release-date/stravo1/obsidian-gdrive-sync)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/m/stravo1/obsidian-gdrive-sync)
-[![Discord](https://img.shields.io/discord/1238748000344608788)](https://img.shields.io/discord/1238748000344608788?link=https%3A%2F%2Fdiscord.gg%2FdPasX4Ac2P)
-
+# Warning! 
+There is experimental and probably buggy code here so please backup your vault to like 3 different locations before using this plugin (You should be backing it up already before using any plugin)
+New features(implemented and coming):
+- [X] Merging changes notice remover 
+- [ ] 
+- [ ] 
 
 ## Overview
 
