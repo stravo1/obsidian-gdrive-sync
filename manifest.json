@@ -1,10 +1,10 @@
 {
 	"id": "obsidian-gdrive-sync",
-	"name": "Google Drive Sync",
+	"name": "Google Drive Sync(Red's version)",
 	"version": "0.9.9-beta-15",
 	"minAppVersion": "0.15.0",
 	"description": "Sync vault files to Google Drive",
-	"author": "stravo1",
-	"authorUrl": "https://stravo.one",
+	"author": "RedMarbles",
+	"authorUrl": "https://github.com/RedMarbles1/",
 	"isDesktopOnly": false
 }
