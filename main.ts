@@ -117,6 +117,8 @@ interface driveValues {
 	rootFolderId: any;
 	refresh: boolean;
 	refreshTime: string;
+	removeMergeNotices: boolean;
+	removeMergeNoticesInterval: string;
 	autoRefreshBinaryFiles: string;
 	errorLoggingToFile: boolean;
 	verboseLoggingToFile: boolean;
@@ -140,8 +142,8 @@ const DEFAULT_SETTINGS: driveValues = {
 	errorLoggingToFile: false,
 	verboseLoggingToFile: false,
 	blacklistPaths: [],
-	//writingFile: false,
-	//syncQueue: false,
+	removeMergeNotices: false,
+	removeMergeNoticesInterval: "100"
 };
 
 const metaPattern = /^---\n[\s\S]*---/;
@@ -183,8 +185,10 @@ export default class driveSyncPlugin extends Plugin {
 	haltAllOperations: boolean = false;
 	adapter: FileSystemAdapter;
 	attachmentTrackingInitializationComplete: boolean = false;
-
+	
 	completeAllPendingSyncs = async () => {
+		console.log(this.settings.removeMergeNotices)
+		console.log(this.settings.removeMergeNoticesInterval)
 		if (this.haltAllOperations) {
 			return;
 		}
@@ -223,6 +227,8 @@ export default class driveSyncPlugin extends Plugin {
 		let finalNamesForFileIDMap = objectToMap(finalNamesForFileID);
 
 		console.log(pendingSyncItems, finalNamesForFileID);
+		
+		
 
 		if (pendingSyncItems.length) {
 			new Notice(
@@ -290,7 +296,9 @@ export default class driveSyncPlugin extends Plugin {
 									uuidToFileIdMap.get(item.fileID)
 										? uuidToFileIdMap.get(item.fileID)
 										: item.fileID,
-									buffer
+									buffer, 
+									this.settings.removeMergeNotices, 
+									this.settings.removeMergeNoticesInterval
 								);
 							}
 						}
@@ -873,7 +881,7 @@ export default class driveSyncPlugin extends Plugin {
 		});
 		if (file.extension == "md") await this.updateLastSyncMetaTag(file);
 		var buffer = await this.app.vault.readBinary(file);
-		await modifyFile(this.settings.accessToken, id, buffer);
+		await modifyFile(this.settings.accessToken, id, buffer, this.settings.removeMergeNotices, this.settings.removeMergeNoticesInterval);
 		await this.refreshFilesListInDriveAndStoreInSettings();
 
 		this.statusBarItem.classList.replace("sync_icon", "sync_icon_still");
@@ -1776,11 +1784,13 @@ export default class driveSyncPlugin extends Plugin {
 							await this.writeToVerboseLogFile(
 								"LOG: modifying file while offline"
 							);
+							
 							this.pendingSyncItems.push({
 								fileID: id,
 								action: "MODIFY",
 								timeStamp: new Date().toString(),
 							});
+							
 						}
 						await this.writeToPendingSyncFile();
 						return;
@@ -1912,7 +1922,9 @@ export default class driveSyncPlugin extends Plugin {
 					var res = await modifyFile(
 						this.settings.accessToken,
 						id,
-						buffer
+						buffer,
+						this.settings.removeMergeNotices,
+						this.settings.removeMergeNoticesInterval
 					);
 					new Notice("Uploaded!");
 				} catch (err) {
@@ -1989,7 +2001,9 @@ export default class driveSyncPlugin extends Plugin {
 					var res = await modifyFile(
 						this.settings.accessToken,
 						id,
-						buffer
+						buffer,
+						this.settings.removeMergeNotices,
+						this.settings.removeMergeNoticesInterval
 					);
 					new Notice("Uploaded!");
 				} catch (err) {
@@ -2199,6 +2213,32 @@ class syncSettings extends PluginSettingTab {
 					this.plugin.saveSettings();
 				});
 			});
+		new Setting(containerEl)
+			.setName("Remove merging changes notices automatically (NOT RECOMMENDED)")
+			.setDesc(
+				"This enables a hacky fix that removes any merging changes notice that sometimes appears while typing. It does not prevent the notice from appearing but rather removes it as soon as it appears."
+			)
+			.addToggle((toggle) => {
+				toggle.setValue(this.plugin.settings.removeMergeNotices);
+				toggle.onChange((val) => {
+					this.plugin.settings.removeMergeNotices = val;
+					this.plugin.saveSettings();
+				});
+			});
+		new Setting(containerEl)
+			.setName("Set notice checking interval")
+			.setDesc(
+				"Enter the time in milliseconds after which the plugin checks for a merging changes notice. Lower values may prevent the notice from ever being a visible problem but may cause lag on lower end devices. Does not do anything if the above option is not enabled."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Enter time")
+					.setValue(this.plugin.settings.removeMergeNoticesInterval)
+					.onChange(async (value) => {
+						this.plugin.settings.removeMergeNoticesInterval = value;
+						this.plugin.saveSettings();
+					})
+			);
 		new Setting(containerEl)
 			.setName("Upload all")
 			.setDesc(

@@ -1,7 +1,22 @@
 import { requestUrl } from "obsidian";
 
-const newError = (actionName, err) => {
-	return new Error(`ERROR: Unable to complete action: - ${actionName} => ${err.name} - ${err.message} - ${err.stack}`)
+let foundNotice = false;
+function removeMergeNotifs(toggle) {
+	//Add a setting for it and check if its enabled here
+	const notices = document.querySelectorAll('.notice');
+	if(toggle){
+    	notices.forEach(notice => {
+        	if (notice.textContent.includes("has been modified externally")) {
+            	notice.remove();
+				console.log("A merge notice has been removed!")
+				return
+        	}
+	});
+	}
+};
+
+function newError(actionName, err) {
+	return new Error(`ERROR: Unable to complete action: - ${actionName} => ${err.name} - ${err.message} - ${err.stack}`);
 }
 
 const getVaultId = async (accessToken, vault, root = null) => {
@@ -70,8 +85,19 @@ const uploadFile = async (
 	}
 };
 
-const modifyFile = async (accessToken, fileId, buffer) => {
+const modifyFile = async (accessToken, fileId, buffer, noticeToggle, noticeInterval) => {
 	try {
+		// Should remove any merge notices that might appear.
+		console.log("Trying to set interval for the notice checker, should be cleared after notice has been removed")
+		let noticeRemoveInterval = setInterval(() => {
+			removeMergeNotifs(noticeToggle); 
+			if(foundNotice){
+				clearInterval(noticeRemoveInterval); //Clear the interval to prevent unnecessary runs and resource usage
+				foundNotice = false;
+				console.log("Cleared interval!")
+			}
+		}, parseInt(noticeInterval));
+		console.log("Actually syncing now")
 		var res = await requestUrl({
 			url: `https://www.googleapis.com/upload/drive/v3/files/${fileId}`,
 			method: "PATCH",
@@ -82,6 +108,7 @@ const modifyFile = async (accessToken, fileId, buffer) => {
 			contentType: "application/json",
 			body: buffer,
 		}).catch((e) => console.log(e));
+		clearInterval(noticeRemoveInterval); // After the file is synced, there is no reason to check for merge notices so the interval stops.
 		return res;
 	} catch (err) {
 		console.log(err);
