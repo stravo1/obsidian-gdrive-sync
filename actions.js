@@ -88,16 +88,14 @@ const uploadFile = async (
 const modifyFile = async (accessToken, fileId, buffer, noticeToggle, noticeInterval) => {
 	try {
 		// Should remove any merge notices that might appear.
-		console.log("Trying to set interval for the notice checker, should be cleared after notice has been removed")
+
 		let noticeRemoveInterval = setInterval(() => {
 			removeMergeNotifs(noticeToggle); 
 			if(foundNotice){
 				clearInterval(noticeRemoveInterval); //Clear the interval to prevent unnecessary runs and resource usage
 				foundNotice = false;
-				console.log("Cleared interval!")
 			}
 		}, parseInt(noticeInterval));
-		console.log("Actually syncing now")
 		var res = await requestUrl({
 			url: `https://www.googleapis.com/upload/drive/v3/files/${fileId}`,
 			method: "PATCH",
