@@ -188,6 +188,9 @@ export default class driveSyncPlugin extends Plugin {
 		if (this.haltAllOperations) {
 			return;
 		}
+		if (this.completingPendingSync) {
+			return;
+		}
 		/* files created when offline are assigned a dummy fileId 
 		so the following Map keeps track of the dummy fielId to the actual fileId 
 		which is retrieved when the file is uploadedf for the first time when online */
@@ -257,6 +260,9 @@ export default class driveSyncPlugin extends Plugin {
 									: item.fileID
 							);
 						}
+						await this.writeToVerboseLogFile(
+							"LOG: Deleted file. [PS]"
+						);
 						break;
 					case "UPLOAD":
 						var fileName = finalNamesForFileIDMap.get(item.fileID!);
@@ -274,6 +280,9 @@ export default class driveSyncPlugin extends Plugin {
 						uuidToFileIdMap.set(item.fileID, actualId);
 						finalNamesForFileIDMap.set(actualId, fileName!);
 						this.finalNamesForFileID.set(actualId, fileName!);
+						await this.writeToVerboseLogFile(
+							"LOG: Uploaded file. [PS]"
+						);
 						break;
 					case "MODIFY":
 						if (pendingSyncTime > lastCloudUpdateTime) {
@@ -293,6 +302,9 @@ export default class driveSyncPlugin extends Plugin {
 									buffer
 								);
 							}
+							await this.writeToVerboseLogFile(
+								"LOG: Modified file. [PS]"
+							);
 						}
 						break;
 					case "RENAME":
@@ -305,6 +317,9 @@ export default class driveSyncPlugin extends Plugin {
 								finalNamesForFileIDMap.get(item.fileID!)
 							);
 						}
+						await this.writeToVerboseLogFile(
+							"LOG: Renamed file. [PS]"
+						);
 						break;
 				}
 				this.pendingSyncItems.shift();
@@ -420,6 +435,26 @@ export default class driveSyncPlugin extends Plugin {
 		}
 		try {
 			await this.writeToVerboseLogFile("LOG: Enerting cleanInstall");
+			if (!this.settings.rootFolderId) {
+				await this.writeToErrorLogFile(
+					new Error("ERROR: Root folder does not exist")
+				);
+				new Notice(
+					"ERROR: Root folder does not exist. Please reload the plug-in."
+				);
+				new Notice(
+					"If this error persists, please check if there is a folder named 'obsidian' in your Google Drive."
+				);
+				new Notice(
+					"If there is one and you are still getting this error, consider joining the Discord server for help.",
+					3000
+				);
+				new Notice(
+					"If there is no folder named 'obsidian' in your Drive root, try using the 'Create root folder' button in Settings.",
+					4000
+				);
+				return;
+			}
 			new Notice("Creating vault in Google Drive...");
 			var res = await uploadFolder(
 				this.settings.accessToken,
@@ -652,7 +687,7 @@ export default class driveSyncPlugin extends Plugin {
 					if (file.slice(-3) == ".md") {
 						continue;
 					}
-					console.log("Creating attachment tracking file: " + file);
+					console.log("Trying to attachment tracking file: " + file);
 
 					let convertedSafeFilename = file.replace(/\//g, ".");
 					try {
@@ -1781,6 +1816,7 @@ export default class driveSyncPlugin extends Plugin {
 								action: "MODIFY",
 								timeStamp: new Date().toString(),
 							});
+							this.finalNamesForFileID.set(id!, e.path);
 						}
 						await this.writeToPendingSyncFile();
 						return;
@@ -2061,7 +2097,9 @@ class syncSettings extends PluginSettingTab {
 			cls: "main",
 		});
 
-		const sync = containerEl.createEl("div", { cls: "container" });
+		const sync = containerEl.createEl("div", {
+			cls: "container-gdrive-plugin",
+		});
 
 		if (this.plugin.settings.validToken) {
 			// if token is valid
@@ -2162,12 +2200,32 @@ class syncSettings extends PluginSettingTab {
 		if (!this.plugin.settings.vaultInit) {
 			new Setting(containerEl)
 				.setName("Initialize vault")
-				.setDesc("Create vault and sync all files to Google Drive")
+				.setDesc(
+					"Create vault and sync all files to Google Drive. DO NOT use this button if you are getting errors related to root folder!"
+				)
 				.addButton((button) => {
 					button.setButtonText("Proceed");
 					button.onClick(
 						async () => await this.plugin.cleanInstall()
 					);
+				});
+			new Setting(containerEl)
+				.setName("Create Root Folder Forecfully")
+				.setDesc(
+					"Experimental: Use this only if you get an error related to root folder."
+				)
+				.addButton((button) => {
+					button.setButtonText("Proceed");
+					button.onClick(async () => {
+						this.plugin.settings.rootFolderId = await uploadFolder(
+							this.plugin.settings.accessToken,
+							"obsidian"
+						);
+						new Notice(
+							"Root folder created, please reload the plugin."
+						);
+						this.plugin.saveSettings();
+					});
 				});
 			return;
 		}
