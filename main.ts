@@ -1690,7 +1690,7 @@ export default class driveSyncPlugin extends Plugin {
 						await this.writeToVerboseLogFile(
 							"LOG: Connectivity lost, not deleting files from Google Drive"
 						);
-						let id;
+						let id: any;
 						this.settings.filesList.map((file, index) => {
 							if (file.name == e.path) {
 								id = file.id;
@@ -1788,7 +1788,7 @@ export default class driveSyncPlugin extends Plugin {
 								this.finalNamesForFileID.set(id, e.path);
 							}
 						} else {
-							let id;
+							let id: any;
 							if (this.renamedWhileOffline.get(e.path)) {
 								id = this.renamedWhileOffline.get(e.path);
 							} else {
