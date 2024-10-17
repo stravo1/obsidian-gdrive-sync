@@ -2257,62 +2257,63 @@ class syncSettings extends PluginSettingTab {
 					this.plugin.saveSettings();
 				});
 			});
-		new Setting(containerEl)
-			.setName("Upload all")
-			.setDesc(
-				"Upload all files to Google Drive, thus DELETING ALL PREVIOUS FILES"
-			)
-			.addButton((button) =>
-				button.setIcon("cloud").onClick(async () => {
-					new Notice("Clearing vault in Google Drive...");
-					await deleteFile(
-						this.plugin.settings.accessToken,
-						this.plugin.settings.vaultId
-					);
-					await this.plugin.cleanInstall();
-				})
-			);
-		new Setting(containerEl)
-			.setName("Download all")
-			.setDesc(
-				"Download all files from Google Drive, thus DELETING ALL PREVIOUS FILES"
-			)
-			.addButton((button) =>
-				button.setIcon("install").onClick(async () => {
-					new Notice("Clearing vault...");
-					var filesList = this.app.vault.getFiles();
-					this.plugin.settings.refresh = true;
-					for (const file of filesList) {
-						this.app.vault.delete(file, true);
-					}
-					new Notice("Downloading files...");
-					for (const file of this.plugin.settings.filesList) {
-						//console.log(file);
+		/* -- LEGACY BUTTONS, CODE TO BE REMOVED -- */
+		// new Setting(containerEl)
+		// 	.setName("Upload all")
+		// 	.setDesc(
+		// 		"Upload all files to Google Drive, thus DELETING ALL PREVIOUS FILES"
+		// 	)
+		// 	.addButton((button) =>
+		// 		button.setIcon("cloud").onClick(async () => {
+		// 			new Notice("Clearing vault in Google Drive...");
+		// 			await deleteFile(
+		// 				this.plugin.settings.accessToken,
+		// 				this.plugin.settings.vaultId
+		// 			);
+		// 			await this.plugin.cleanInstall();
+		// 		})
+		// 	);
+		// new Setting(containerEl)
+		// 	.setName("Download all")
+		// 	.setDesc(
+		// 		"Download all files from Google Drive, thus DELETING ALL PREVIOUS FILES"
+		// 	)
+		// 	.addButton((button) =>
+		// 		button.setIcon("install").onClick(async () => {
+		// 			new Notice("Clearing vault...");
+		// 			var filesList = this.app.vault.getFiles();
+		// 			this.plugin.settings.refresh = true;
+		// 			for (const file of filesList) {
+		// 				this.app.vault.delete(file, true);
+		// 			}
+		// 			new Notice("Downloading files...");
+		// 			for (const file of this.plugin.settings.filesList) {
+		// 				//console.log(file);
 
-						var res = await getFile(
-							this.plugin.settings.accessToken,
-							file.id
-						);
-						await this.app.vault
-							.createBinary(res[0], res[1])
-							.catch(async () => {
-								var path = res[0]
-									.split("/")
-									.slice(0, -1)
-									.join("/");
-								//console.log(path);
+		// 				var res = await getFile(
+		// 					this.plugin.settings.accessToken,
+		// 					file.id
+		// 				);
+		// 				await this.app.vault
+		// 					.createBinary(res[0], res[1])
+		// 					.catch(async () => {
+		// 						var path = res[0]
+		// 							.split("/")
+		// 							.slice(0, -1)
+		// 							.join("/");
+		// 						//console.log(path);
 
-								await this.app.vault.createFolder(path);
-								await this.app.vault.createBinary(
-									res[0],
-									res[1]
-								);
-							});
-					}
-					this.plugin.settings.refresh = false;
-					new Notice("Sync complete :)");
-				})
-			);
+		// 						await this.app.vault.createFolder(path);
+		// 						await this.app.vault.createBinary(
+		// 							res[0],
+		// 							res[1]
+		// 						);
+		// 					});
+		// 			}
+		// 			this.plugin.settings.refresh = false;
+		// 			new Notice("Sync complete :)");
+		// 		})
+		// 	);
 		new Setting(containerEl)
 			.setName("Blacklist paths")
 			.setDesc(
