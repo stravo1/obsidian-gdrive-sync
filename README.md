@@ -1,4 +1,3 @@
-### THE PLUGIN BREAKS WITH THE NEW 1.7 VERSION OF OBSIDIAN, TRACK UPDATES [HERE](https://github.com/stravo1/obsidian-gdrive-sync/issues/55).
 # Obsidian Google Drive Sync Plugin
 
 ![GitHub last commit](https://img.shields.io/github/last-commit/stravo1/obsidian-gdrive-sync)
@@ -12,6 +11,8 @@
 The Obsidian Google Drive Sync Plugin is a plugin that allows you to seamlessly sync your notes across devices with Google Drive. It is a free alternative to the paid [Obsidian Sync](https://obsidian.md/sync) service. With just a few simple steps, you can enable auto sync and enjoy the convenience of accessing your notes from any device, be it mobile or dekstop, always up-to-date!
 
 This plugin is designed to be easy to install and configure compared to other plugins, no need to tackle git repos or manage Google Cloud Projects or setup any other external app.
+
+> ⚠️ Versions older than [beta-17](https://github.com/stravo1/obsidian-gdrive-sync/releases/tag/v0.9.9-beta-17) are not entirely compatible with Obsidian v1.7 and newer.
 
 > ⚠️ The plugin is under active development, new releases might introduce bugs, old releases maybe be incompatible with the new ones. This might lead to data loss. Do read the [FAQs](#faqs) before trying out the plugin. Please create a BACKUP of your vault before you install and try this plugin. The plug-in is not optimised for vault having more than 1k files, working on optimization for large vaults.
 
@@ -87,6 +88,9 @@ The plug-in has limited access to only those files it creates itself, so it can'
 
 #### Q. Notes created from templates get deleted automatically. How to solve it?  
 The plug-in uses the "lastSync" tag to keep track of synced files. So if a new note having the "lastSync" tag of the template from which it was created is detected by the plug-in it assumes that this "new" note was already synced as it has the "lastSync" tag (which is not true as it got the tag from the template) and as it can't find this "new" note on Drive (of cource it can't, it was never uploaded) it deletes the note to keep it in sync with Drive. Solution is to add the name of the template note/folder containing templates under the Blacklist option in settings and remove the "lastSync" tag from the template note(s) if it(they) has(have) the tag. 
+
+#### Q. Files got deleted accidentally or due to plugin errors, what to do?  
+Do not panic, all files deleted by the plugin goes to the .trash folder in your vault folder in your desktop or mobile devices. You can get them from there. However for restoring them to the vault, do the following: disable this plugin, restore the required notes from .trash folder, remove the lastSync tag from the notes, enable plugin again. Not doing this will keep deleting the notes which were restored with the lastSync tag intact.
   
 #### Q. Why is this plugin not on the official Obsidian Plugin List?  
 A. It is very much in beta and not ready for "public" release, and will require a lot of testing and changes before it can be listed on the official plugins' list. there's a genuine risk of data loss (although i have tried my best to cover all edge cases but can't risk other people's data solely on my coding skills 😅). tldr: personally i don't want an unfinished plug-in with risk of data loss being listed as "official" :)
