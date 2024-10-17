@@ -183,8 +183,13 @@ export default class driveSyncPlugin extends Plugin {
 	haltAllOperations: boolean = false;
 	adapter: FileSystemAdapter;
 	attachmentTrackingInitializationComplete: boolean = false;
+	layoutReady: boolean = false;
 
 	completeAllPendingSyncs = async () => {
+		if (!this.app.workspace.layoutReady) {
+			// Workspace is still loading, do nothing
+			return;
+		}
 		if (this.haltAllOperations) {
 			return;
 		}
@@ -392,6 +397,10 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	notifyError = async () => {
+		if (!this.app.workspace.layoutReady || !this.layoutReady) {
+			// Workspace is still loading, do nothing
+			return;
+		}
 		if (this.haltAllOperations) {
 			return;
 		}
@@ -492,6 +501,10 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	refreshAll = async () => {
+		if (!this.app.workspace.layoutReady || !this.layoutReady) {
+			// Workspace is still loading, do nothing
+			return;
+		}
 		if (this.haltAllOperations) {
 			return;
 		}
@@ -798,6 +811,10 @@ export default class driveSyncPlugin extends Plugin {
 		file: TFile,
 		forced: "forced" | false = false
 	) => {
+		if (!this.app.workspace.layoutReady || !this.layoutReady) {
+			// Workspace is still loading, do nothing
+			return;
+		}
 		try {
 			if (this.haltAllOperations) {
 				return;
@@ -919,6 +936,10 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	checkAndEmptySyncQueue = async () => {
+		if (!this.app.workspace.layoutReady || !this.layoutReady) {
+			// Workspace is still loading, do nothing
+			return;
+		}
 		if (
 			this.haltAllOperations ||
 			this.completingPendingSync ||
@@ -1051,13 +1072,21 @@ export default class driveSyncPlugin extends Plugin {
 				})
 			);
 		} else {
-			await this.app.vault.create(
-				PENDING_SYNC_FILE_NAME,
-				JSON.stringify({
-					pendingSyncItems: this.pendingSyncItems,
-					finalNamesForFileID: mapToObject(this.finalNamesForFileID),
-				})
-			);
+			try {
+				await this.app.vault.create(
+					PENDING_SYNC_FILE_NAME,
+					JSON.stringify({
+						pendingSyncItems: this.pendingSyncItems,
+						finalNamesForFileID: mapToObject(
+							this.finalNamesForFileID
+						),
+					})
+				);
+			} catch (err) {
+				console.log(
+					"CAUGHT: ERROR for PENDIND SYNC: Probably during startup"
+				);
+			}
 		}
 		await this.writeToVerboseLogFile("LOG: Exited writeToPendingSyncFile");
 	};
@@ -1092,6 +1121,10 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	writeToErrorLogFile = async (log: Error) => {
+		if (!this.app.workspace.layoutReady || !this.layoutReady) {
+			// Workspace is still loading, do nothing
+			return;
+		}
 		await this.writeToVerboseLogFile("LOG: Entering writeToErrorLogFile");
 		if (!this.settings.errorLoggingToFile) {
 			return;
@@ -1115,12 +1148,18 @@ export default class driveSyncPlugin extends Plugin {
 				);
 				this.errorLoggingForTheFirstTimeInThisSession = false;
 			} else {
-				await this.app.vault.create(
-					ERROR_LOG_FILE_NAME,
-					`${new Date().toString()}-${log.name}-${log.message}-${
-						log.stack
-					}`
-				);
+				try {
+					await this.app.vault.create(
+						ERROR_LOG_FILE_NAME,
+						`${new Date().toString()}-${log.name}-${log.message}-${
+							log.stack
+						}`
+					);
+				} catch (err) {
+					console.log(
+						"CAUGHT: ERROR for ERROR LOGS: Probably during startup"
+					);
+				}
 			}
 		} catch (err) {
 			console.log(err);
@@ -1129,6 +1168,10 @@ export default class driveSyncPlugin extends Plugin {
 	};
 
 	writeToVerboseLogFile = async (log: string) => {
+		if (!this.app.workspace.layoutReady || !this.layoutReady) {
+			// Workspace is still loading, do nothing
+			return;
+		}
 		if (!this.settings.verboseLoggingToFile) {
 			return;
 		}
@@ -1151,7 +1194,16 @@ export default class driveSyncPlugin extends Plugin {
 				// console.log("modified", log, `${content}\n\n${log}`);
 				this.verboseLoggingForTheFirstTimeInThisSession = false;
 			} else {
-				await this.app.vault.create(VERBOSE_LOG_FILE_NAME, `${log}`);
+				try {
+					await this.app.vault.create(
+						VERBOSE_LOG_FILE_NAME,
+						`${log}`
+					);
+				} catch (err) {
+					console.log(
+						"CAUGHT: ERROR for VERBOSE LOGS: Probably during startup"
+					);
+				}
 			}
 		} catch (err) {
 			console.log(err);
@@ -1183,8 +1235,9 @@ export default class driveSyncPlugin extends Plugin {
 		return false;
 	};
 
-	async onload() {
+	initFunction = async () => {
 		this.adapter = this.app.vault.adapter as FileSystemAdapter;
+		this.layoutReady = true;
 		await this.loadSettings();
 
 		await this.writeToVerboseLogFile("LOG: getAccessToken");
@@ -1405,7 +1458,10 @@ export default class driveSyncPlugin extends Plugin {
 			.map((file) => this.localFiles.push(file.path));
 
 		//console.log(toUpload, toDownload);
+	};
 
+	async onload() {
+		this.app.workspace.onLayoutReady(this.initFunction);
 		this.registerEvent(
 			this.app.vault.on("rename", async (newFile, oldpath) => {
 				if (ignoreFiles.includes(newFile.path)) {
@@ -1591,6 +1647,10 @@ export default class driveSyncPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.vault.on("create", async (e) => {
+				if (!this.app.workspace.layoutReady) {
+					// Workspace is still loading, do nothing
+					return;
+				}
 				if (ignoreFiles.includes(e.path)) {
 					return;
 				}
