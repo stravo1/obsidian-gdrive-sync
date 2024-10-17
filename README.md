@@ -1,3 +1,4 @@
+### THE PLUGIN BREAKS WITH THE NEW 1.7 VERSION OF OBSIDIAN, TRACK UPDATES [HERE](https://github.com/stravo1/obsidian-gdrive-sync/issues/55).
 # Obsidian Google Drive Sync Plugin
 
 ![GitHub last commit](https://img.shields.io/github/last-commit/stravo1/obsidian-gdrive-sync)
