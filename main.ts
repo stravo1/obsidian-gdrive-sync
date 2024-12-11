@@ -480,13 +480,12 @@ export default class driveSyncPlugin extends Plugin {
 			let noOfFiles = filesList.length;
 			let count = 0;
 			for (const file of filesList) {
-				const buffer: any = await this.app.vault.readBinary(file);
-				await uploadFile(
-					this.settings.accessToken,
-					file.path,
-					buffer,
-					this.settings.vaultId
-				);
+				// const buffer: any = await this.app.vault.readBinary(file);
+				if (file.extension != "md") {
+					await this.uploadNewAttachment(file);
+				} else {
+					await this.uploadNewNotesFile(file);
+				}
 				count++;
 				new Notice("Uploaded " + count + "/" + noOfFiles + " files");
 			}
@@ -1729,17 +1728,19 @@ export default class driveSyncPlugin extends Plugin {
 					return;
 				}
 
-				let convertedSafeFilename = e.path.replace(/\//g, ".");
-				try {
-					await this.adapter.remove(
-						`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
-					);
-				} catch (err) {
-					await this.writeToErrorLogFile(err);
-					await this.writeToVerboseLogFile(
-						"LOG: Could not delete " +
+				if (e instanceof TFile && e.extension != "md") {
+					let convertedSafeFilename = e.path.replace(/\//g, ".");
+					try {
+						await this.adapter.remove(
 							`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
-					);
+						);
+					} catch (err) {
+						await this.writeToErrorLogFile(err);
+						await this.writeToVerboseLogFile(
+							"LOG: Could not delete " +
+								`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+						);
+					}
 				}
 
 				try {
