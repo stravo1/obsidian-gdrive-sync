@@ -29,6 +29,7 @@ This plugin is designed to be easy to install and configure compared to other pl
 - **Secure and Reliable**: Your notes are securely stored on YOUR Google Drive, and the plugin does NOT store/collect any data whatsoever.
 
 ## Installation
+> The plugin is [BRAT](https://github.com/TfTHacker/obsidian42-brat) compatible, it can be easity installed and updated through the BRAT plugin.
 
 To install the Obsidian Google Drive Auto Sync Plugin, follow these steps (if you have previoulsy installed any unofficial plugin the steps are identical):
 
