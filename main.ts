@@ -9,6 +9,7 @@ import {
 	TAbstractFile,
 	TFile,
 	FileSystemAdapter,
+	EditorPosition,
 } from "obsidian";
 
 import axios from "axios";
@@ -1018,10 +1019,12 @@ export default class driveSyncPlugin extends Plugin {
 
 		var metaExists = metaPattern.test(content);
 		var driveDataExists = driveDataPattern.test(content);
+		
+		const lastEditor = this.app.workspace.activeEditor;
 
 		if (metaExists) {
 			if (driveDataExists) {
-				this.app.vault.modify(
+				await this.app.vault.modify(
 					e,
 					content.replace(
 						driveDataPattern,
@@ -1029,7 +1032,7 @@ export default class driveSyncPlugin extends Plugin {
 					)
 				);
 			} else {
-				this.app.vault.modify(
+				await this.app.vault.modify(
 					e,
 					content.replace(
 						/^---\n/g,
@@ -1038,10 +1041,13 @@ export default class driveSyncPlugin extends Plugin {
 				);
 			}
 		} else {
-			this.app.vault.modify(
+			await this.app.vault.modify(
 				e,
 				`---\nlastSync: ${new Date().toString()}\n---\n` + content
 			);
+		}
+		if(lastEditor) {
+			lastEditor?.editor?.focus();
 		}
 		await this.writeToVerboseLogFile("LOG: Exited updateLastSyncMetaTag");
 	};
