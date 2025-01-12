@@ -87,6 +87,31 @@ Unfortunately no, for security reasons the plug-in has access to only those file
 #### Q. What about security and privacy?  
 The plug-in has limited access to only those files it creates itself, so it can't read any other files on your Drive. While giving the plug-in the necessary permissions you can confirm it yourself. And as for the token exchange part a server has to be unfortunately involved. I have a server hosted (whose link is the LogIn link) which does the code exchange for you, you can however implement your own Google Cloud Project and retrieve the refresh token. The plug-in just requires the refresh token to work, how it is retrieved is none of it's concern. More info at https://github.com/stravo1/obsidian-gdrive-sync/issues/24
 
+#### Q. How can I use my own oAuth callback server to generate an access token.
+In the plugins data.json file, include the following fields to the JSON object, replacing the below default values with your server URL.
+  ```json
+  {
+	"refreshAccessTokenURL": "https://red-formula-303406.ue.r.appspot.com/auth/obsidian/refresh-token",
+	"fetchRefreshTokenURL": "https://red-formula-303406.ue.r.appspot.com/auth/obsidian",
+  }
+  ```
+  *  'fetchRefreshTokenURL' is the URL you will click that should in whatever way you choose provide you with a valid refresh token based on your Google SSO.
+  *  'refreshAccessTokenURL' is the URL that the server will call with your refresh token and expect an access token back, see below example.
+
+      ```json
+      Request from Obsidian to your server:
+      {
+        "refresh_token": "[plain text refresh token will be here]"
+      }
+
+      Response from your server to Obsidian:
+      {
+        "access_token": "[plain text access token will be here]"
+      }
+      ```
+
+  You must ensure that your server is sending back the correct CORS headers, if things aren't working thats probably the cause. Just log the request and determine the origin you need to allow.
+
 #### Q. Notes created from templates get deleted automatically. How to solve it?  
 The plug-in uses the "lastSync" tag to keep track of synced files. So if a new note having the "lastSync" tag of the template from which it was created is detected by the plug-in it assumes that this "new" note was already synced as it has the "lastSync" tag (which is not true as it got the tag from the template) and as it can't find this "new" note on Drive (of cource it can't, it was never uploaded) it deletes the note to keep it in sync with Drive. Solution is to add the name of the template note/folder containing templates under the Blacklist option in settings and remove the "lastSync" tag from the template note(s) if it(they) has(have) the tag. 
 

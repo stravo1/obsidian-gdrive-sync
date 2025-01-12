@@ -80,12 +80,13 @@ function compare(a: Uint8Array, b: Uint8Array) {
 
 const getAccessToken = async (
 	refreshToken: string,
+	refreshAccessTokenURL: string,
 	showError: boolean = false
 ) => {
 	var response;
 	await axios
 		.post(
-			"https://red-formula-303406.ue.r.appspot.com/auth/obsidian/refresh-token",
+			refreshAccessTokenURL,
 			{
 				refreshToken,
 			}
@@ -111,6 +112,8 @@ interface driveValues {
 	refreshToken: string;
 	accessToken: string;
 	accessTokenExpiryTime: string;
+	refreshAccessTokenURL: string;
+	fetchRefreshTokenURL: string;
 	validToken: Boolean;
 	vaultId: any;
 	vaultInit: boolean;
@@ -130,6 +133,8 @@ const DEFAULT_SETTINGS: driveValues = {
 	refreshToken: "",
 	accessToken: "",
 	accessTokenExpiryTime: "",
+	refreshAccessTokenURL: "https://red-formula-303406.ue.r.appspot.com/auth/obsidian/refresh-token",
+	fetchRefreshTokenURL: "https://red-formula-303406.ue.r.appspot.com/auth/obsidian",
 	validToken: false,
 	vaultId: "",
 	filesList: [],
@@ -525,6 +530,7 @@ export default class driveSyncPlugin extends Plugin {
 				);
 				var res: any = await getAccessToken(
 					this.settings.refreshToken,
+					this.settings.refreshAccessTokenURL,
 					false
 				);
 				if (res == "error") {
@@ -1246,7 +1252,7 @@ export default class driveSyncPlugin extends Plugin {
 		await this.loadSettings();
 
 		await this.writeToVerboseLogFile("LOG: getAccessToken");
-		var res: any = await getAccessToken(this.settings.refreshToken, true); // get accessToken
+		var res: any = await getAccessToken(this.settings.refreshToken, this.settings.refreshAccessTokenURL, true); // get accessToken
 		var count = 0;
 		while (res == "error") {
 			new Notice(
@@ -1276,7 +1282,7 @@ export default class driveSyncPlugin extends Plugin {
 			await this.writeToVerboseLogFile(
 				"LOG: trying to fetch accessToken again"
 			);
-			res = await getAccessToken(this.settings.refreshToken);
+			res = await getAccessToken(this.settings.refreshToken, this.settings.refreshAccessTokenURL);
 			count++;
 			if (count == 6) {
 				this.settings.accessToken = "";
@@ -2182,8 +2188,7 @@ class syncSettings extends PluginSettingTab {
 				text: "Open this link to log in",
 				cls: "sync_text",
 			});
-			sync_link.href =
-				"https://red-formula-303406.ue.r.appspot.com/auth/obsidian";
+			sync_link.href = this.plugin.settings.fetchRefreshTokenURL;
 		}
 
 		new Setting(containerEl)
@@ -2231,7 +2236,8 @@ class syncSettings extends PluginSettingTab {
 					const sync_icons = sync.createDiv({ cls: "sync_icon" });
 					setIcon(sync_icons, "sync");
 					var res: any = await getAccessToken(
-						this.plugin.settings.refreshToken
+						this.plugin.settings.refreshToken,
+						this.plugin.settings.refreshAccessTokenURL,
 					); // check for accesstoken
 					if (res != "error") {
 						// display status accordingly
@@ -2257,8 +2263,7 @@ class syncSettings extends PluginSettingTab {
 							text: "Open this link to log in",
 							cls: "sync_text",
 						});
-						sync_link.href =
-							"https://red-formula-303406.ue.r.appspot.com/auth/obsidian";
+						sync_link.href = this.plugin.settings.fetchRefreshTokenURL;
 					}
 					this.plugin.saveSettings();
 				})
