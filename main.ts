@@ -1052,7 +1052,7 @@ export default class driveSyncPlugin extends Plugin {
 				`---\nlastSync: ${new Date().toString()}\n---\n` + content
 			);
 		}
-		if(lastEditor) {
+		if(lastEditor && !lastEditor.editor?.hasFocus()) {
 			lastEditor?.editor?.focus();
 		}
 		await this.writeToVerboseLogFile("LOG: Exited updateLastSyncMetaTag");
