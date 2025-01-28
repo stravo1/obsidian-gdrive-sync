@@ -125,6 +125,7 @@ interface driveValues {
 	errorLoggingToFile: boolean;
 	verboseLoggingToFile: boolean;
 	blacklistPaths: string[];
+	forceFocus: boolean;
 	//writingFile: boolean;
 	//syncQueue: boolean;
 }
@@ -146,6 +147,7 @@ const DEFAULT_SETTINGS: driveValues = {
 	errorLoggingToFile: false,
 	verboseLoggingToFile: false,
 	blacklistPaths: [],
+	forceFocus: false,
 	//writingFile: false,
 	//syncQueue: false,
 };
@@ -1052,7 +1054,7 @@ export default class driveSyncPlugin extends Plugin {
 				`---\nlastSync: ${new Date().toString()}\n---\n` + content
 			);
 		}
-		if(lastEditor && !lastEditor.editor?.hasFocus()) {
+		if(this.settings.forceFocus && lastEditor && !lastEditor.editor?.hasFocus()) {
 			lastEditor?.editor?.focus();
 		}
 		await this.writeToVerboseLogFile("LOG: Exited updateLastSyncMetaTag");
@@ -2133,6 +2135,17 @@ export default class driveSyncPlugin extends Plugin {
 				new Notice("Sync complete :)");
 			},
 		});
+		this.addCommand({
+			id: "toggle-force-sync",
+			name: "Toggle force focus",
+			callback: async () => {
+				this.settings.forceFocus = !this.settings.forceFocus;
+				await this.saveSettings();
+				new Notice(
+					`Force focus is now ${this.settings.forceFocus ? "enabled" : "disabled"}`
+				);
+			},
+		})
 	}
 
 	onunload() {}
@@ -2397,6 +2410,16 @@ class syncSettings extends PluginSettingTab {
 					.onChange((value) => {
 						this.plugin.settings.blacklistPaths = value.split(",");
 					});
+			});
+		new Setting(containerEl)
+			.setName("Force Focus Mode")
+			.setDesc("Experimental: Forcefully bring the note in focus after each sync. Solves #45 issue on Github, but also introduces #75 issue. TLDR: Useful while working with tables, etc. when you lose focus while editing. Keep disabled otherwise. You can quickly toggle this setting using the command 'Toggle Force Focus Mode' in the command palette.")
+			.addToggle((toggle) => {
+				toggle.setValue(this.plugin.settings.forceFocus);
+				toggle.onChange((val) => {
+					this.plugin.settings.forceFocus = val;
+					this.plugin.saveSettings();
+				});
 			});
 	}
 }
