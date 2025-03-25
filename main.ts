@@ -85,12 +85,9 @@ const getAccessToken = async (
 ) => {
 	var response;
 	await axios
-		.post(
-			refreshAccessTokenURL,
-			{
-				refreshToken,
-			}
-		)
+		.post(refreshAccessTokenURL, {
+			refreshToken,
+		})
 		.then((res) => {
 			response = res.data;
 		})
@@ -105,6 +102,22 @@ const getAccessToken = async (
 		});
 	return response;
 };
+
+// inital idea from : https://github.com/stravo1/obsidian-gdrive-sync/commit/55d1c05e06ead00f9a9b86f0b8a8c0a821ce68f3
+// thanks to https://github.com/RedMarbles1 for the contribution
+
+function removeMergeNotifs() {
+	//Add a setting for it and check if its enabled here
+	console.log("Calling this!");
+	const notices = document.querySelectorAll(".notice");
+	notices.forEach((notice) => {
+		if (notice.textContent?.includes("has been modified externally")) {
+			notice.remove();
+			console.log("A merge notice has been removed!");
+			return;
+		}
+	});
+}
 
 const { randomUUID } = new ShortUniqueId({ length: 6 });
 
@@ -126,6 +139,7 @@ interface driveValues {
 	verboseLoggingToFile: boolean;
 	blacklistPaths: string[];
 	forceFocus: boolean;
+	removeMergeNotifsSettings: boolean;
 	//writingFile: boolean;
 	//syncQueue: boolean;
 }
@@ -134,8 +148,10 @@ const DEFAULT_SETTINGS: driveValues = {
 	refreshToken: "",
 	accessToken: "",
 	accessTokenExpiryTime: "",
-	refreshAccessTokenURL: "https://red-formula-303406.ue.r.appspot.com/auth/obsidian/refresh-token",
-	fetchRefreshTokenURL: "https://red-formula-303406.ue.r.appspot.com/auth/obsidian",
+	refreshAccessTokenURL:
+		"https://red-formula-303406.ue.r.appspot.com/auth/obsidian/refresh-token",
+	fetchRefreshTokenURL:
+		"https://red-formula-303406.ue.r.appspot.com/auth/obsidian",
 	validToken: false,
 	vaultId: "",
 	filesList: [],
@@ -148,6 +164,7 @@ const DEFAULT_SETTINGS: driveValues = {
 	verboseLoggingToFile: false,
 	blacklistPaths: [],
 	forceFocus: false,
+	removeMergeNotifsSettings: false,
 	//writingFile: false,
 	//syncQueue: false,
 };
@@ -1054,7 +1071,11 @@ export default class driveSyncPlugin extends Plugin {
 				`---\nlastSync: ${new Date().toString()}\n---\n` + content
 			);
 		}
-		if(this.settings.forceFocus && lastEditor && !lastEditor.editor?.hasFocus()) {
+		if (
+			this.settings.forceFocus &&
+			lastEditor &&
+			!lastEditor.editor?.hasFocus()
+		) {
 			lastEditor?.editor?.focus();
 		}
 		await this.writeToVerboseLogFile("LOG: Exited updateLastSyncMetaTag");
@@ -1254,7 +1275,11 @@ export default class driveSyncPlugin extends Plugin {
 		await this.loadSettings();
 
 		await this.writeToVerboseLogFile("LOG: getAccessToken");
-		var res: any = await getAccessToken(this.settings.refreshToken, this.settings.refreshAccessTokenURL, true); // get accessToken
+		var res: any = await getAccessToken(
+			this.settings.refreshToken,
+			this.settings.refreshAccessTokenURL,
+			true
+		); // get accessToken
 		var count = 0;
 		while (res == "error") {
 			new Notice(
@@ -1284,7 +1309,10 @@ export default class driveSyncPlugin extends Plugin {
 			await this.writeToVerboseLogFile(
 				"LOG: trying to fetch accessToken again"
 			);
-			res = await getAccessToken(this.settings.refreshToken, this.settings.refreshAccessTokenURL);
+			res = await getAccessToken(
+				this.settings.refreshToken,
+				this.settings.refreshAccessTokenURL
+			);
 			count++;
 			if (count == 6) {
 				this.settings.accessToken = "";
@@ -1915,6 +1943,14 @@ export default class driveSyncPlugin extends Plugin {
 					if (this.timer) clearTimeout(this.timer);
 					this.timer = setTimeout(async () => {
 						if (e instanceof TFile) {
+							if (this.settings.removeMergeNotifsSettings) {
+								let intervalId = setInterval(() => {
+									removeMergeNotifs();
+									setTimeout(() => {
+										clearInterval(intervalId);
+									}, 2500);
+								}, 100);
+							}
 							var buffer = await this.app.vault.readBinary(e);
 							if (
 								this.latestContentThatWasSynced != null &&
@@ -2142,10 +2178,12 @@ export default class driveSyncPlugin extends Plugin {
 				this.settings.forceFocus = !this.settings.forceFocus;
 				await this.saveSettings();
 				new Notice(
-					`Force focus is now ${this.settings.forceFocus ? "enabled" : "disabled"}`
+					`Force focus is now ${
+						this.settings.forceFocus ? "enabled" : "disabled"
+					}`
 				);
 			},
-		})
+		});
 	}
 
 	onunload() {}
@@ -2250,7 +2288,7 @@ class syncSettings extends PluginSettingTab {
 					setIcon(sync_icons, "sync");
 					var res: any = await getAccessToken(
 						this.plugin.settings.refreshToken,
-						this.plugin.settings.refreshAccessTokenURL,
+						this.plugin.settings.refreshAccessTokenURL
 					); // check for accesstoken
 					if (res != "error") {
 						// display status accordingly
@@ -2276,7 +2314,8 @@ class syncSettings extends PluginSettingTab {
 							text: "Open this link to log in",
 							cls: "sync_text",
 						});
-						sync_link.href = this.plugin.settings.fetchRefreshTokenURL;
+						sync_link.href =
+							this.plugin.settings.fetchRefreshTokenURL;
 					}
 					this.plugin.saveSettings();
 				})
@@ -2413,11 +2452,27 @@ class syncSettings extends PluginSettingTab {
 			});
 		new Setting(containerEl)
 			.setName("Force Focus Mode")
-			.setDesc("Experimental: Forcefully bring the note in focus after each sync. Solves #45 issue on Github, but also introduces #75 issue. TLDR: Useful while working with tables, etc. when you lose focus while editing. Keep disabled otherwise. You can quickly toggle this setting using the command 'Toggle Force Focus Mode' in the command palette.")
+			.setDesc(
+				"Experimental: Forcefully bring the note in focus after each sync. Solves #45 issue on Github, but also introduces #75 issue. TLDR: Useful while working with tables, etc. when you lose focus while editing. Keep disabled otherwise. You can quickly toggle this setting using the command 'Toggle Force Focus Mode' in the command palette."
+			)
 			.addToggle((toggle) => {
 				toggle.setValue(this.plugin.settings.forceFocus);
 				toggle.onChange((val) => {
 					this.plugin.settings.forceFocus = val;
+					this.plugin.saveSettings();
+				});
+			});
+		new Setting(containerEl)
+			.setName(
+				"Remove merging changes notices automatically (NOT RECOMMENDED)"
+			)
+			.setDesc(
+				"This enables a hacky fix that removes any merging changes notice that sometimes appears while typing. It does not prevent the notice from appearing but rather removes it as soon as it appears."
+			)
+			.addToggle((toggle) => {
+				toggle.setValue(this.plugin.settings.removeMergeNotifsSettings);
+				toggle.onChange((val) => {
+					this.plugin.settings.removeMergeNotifsSettings = val;
 					this.plugin.saveSettings();
 				});
 			});
