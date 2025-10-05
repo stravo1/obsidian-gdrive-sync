@@ -8,7 +8,7 @@
 
 ## Overview
 
-The Obsidian Google Drive Sync Plugin is a plugin that allows you to seamlessly sync your notes across devices with Google Drive. It is a free alternative to the paid [Obsidian Sync](https://obsidian.md/sync) service. With just a few simple steps, you can enable auto sync and enjoy the convenience of accessing your notes from any device, be it mobile or dekstop, always up-to-date!
+The Obsidian Google Drive Sync Plugin is a plugin that allows you to seamlessly sync your notes across devices with Google Drive. It is a free alternative to the paid [Obsidian Sync](https://obsidian.md/sync) service. With just a few simple steps, you can enable auto sync and enjoy the convenience of accessing your notes from any device, be it mobile or desktop, always up-to-date!
 
 This plugin is designed to be easy to install and configure compared to other plugins, no need to tackle git repos or manage Google Cloud Projects or setup any other external app.
 
@@ -29,7 +29,7 @@ This plugin is designed to be easy to install and configure compared to other pl
 - **Secure and Reliable**: Your notes are securely stored on YOUR Google Drive, and the plugin does NOT store/collect any data whatsoever.
 
 ## Installation
-The plugin is [BRAT](https://github.com/TfTHacker/obsidian42-brat) compatible, it can be easity installed and updated through the BRAT plugin.
+The plugin is [BRAT](https://github.com/TfTHacker/obsidian42-brat) compatible, it can be easily installed and updated through the BRAT plugin.
 1. Install the BRAT plugin from the Community Plugins. Enable and open the BRAT plugin.
 
 2. Paste this link in "Add beta plugin" : https://github.com/stravo1/obsidian-gdrive-sync
@@ -60,7 +60,7 @@ Configuring the plugin is straightforward:
 
 2. Choose the Google account whose Drive space will be used. Provide access to all the permissions (`See, edit, create, and delete only the specific Google Drive files you use with this app`).
 
-3. You will be provided with a code/token (`Refresh Token`). Copy the code and paste it in the space provided (Set Refresh Token) under the plugin settings and click on Checkmark button. As prompted, reload the plugin by turing it on and off under Communtiy Plugins.
+3. You will be provided with a code/token (`Refresh Token`). Copy the code and paste it in the space provided (Set Refresh Token) under the plugin settings and click on Checkmark button. As prompted, reload the plugin by turing it on and off under Community Plugins.
 
 4. If you are using this plugin for the first time with a vault, you will be prompted to **Initialize vault**. This creates a folder with the same name as your vault in your Google Drive and copies all the files into it. You might need to reload the plugin again once initialization is complete.
 
@@ -85,13 +85,13 @@ The plugin keeps track of the last time the file was synced on a particular devi
 #### Q. Why does filenames in Google Drive have the entire path of the note and why is the folder structure not recreated in Drive? / Why does it name files like the folder structure instead of just creating the folders?
 > TL;DR: It is not a bug, this is intended behaviour, having the folder structure in the filename directly is much simpler to work with in development compared to replicating folder structure in Drive as Obsidian has the capability to recreate folder structure from the filename.
 
-The Obsidian API can directly provide and construct the folder structure with just the pathname, so while storing in Drive the files are uploaded with their entire path as their filename instaed of creating actual folders. This reduces the complexity of managing folders and subfolders in Drive as everything is in the root vault folder and the filenames of the notes have enough info to reconstruct the actual vault. Obsidian can create all the folders in between if it is told to create a file named "SampleFolder/SubFolder/Test.md". It might look messy in Drive but it is assumed that you are gonna spend most of the time on working in Obsidian and not worry about how the sync is implemented in the backend :)
+The Obsidian API can directly provide and construct the folder structure with just the pathname, so while storing in Drive the files are uploaded with their entire path as their filename instead of creating actual folders. This reduces the complexity of managing folders and subfolders in Drive as everything is in the root vault folder and the filenames of the notes have enough info to reconstruct the actual vault. Obsidian can create all the folders in between if it is told to create a file named "SampleFolder/SubFolder/Test.md". It might look messy in Drive but it is assumed that you are gonna spend most of the time on working in Obsidian and not worry about how the sync is implemented in the backend :)
   
 #### ~Q. Why are my attachments being renamed?~ (SOLVED after [beta-13](https://github.com/stravo1/obsidian-gdrive-sync/releases/tag/v0.9.9-beta-13-fix-3))  
 If you are using a release older then beta-13 then the plugin renames the attachment to keep track of it: the attachments are renamed when they are uploaded because unlike in notes there's no "lastSync" tag that the plug-in can read from the note's content, so to differentiate between which attachments are synced and which are not it's renamed to "attachment_name-synced". I am actively trying to create a workaround for this, but it will take time. After [beta-13](https://github.com/stravo1/obsidian-gdrive-sync/releases/tag/v0.9.9-beta-13-fix-3) this is no more the case (read release notes).
 
 #### Q. Can I manually add files in Drive? / Does the plug-in track files manually added to the Drive folder? / Can I import files manually to the Drive folder?  
-Unfortunately no, for security reasons the plug-in has access to only those files that _it creates_, and it has been made such that all vaults stay under the "obsidian" folder in Drive, and it can only access those files that it has created under that folder to make sure that it is not tampering/reading other sensitive files that the user might have. Here's some techincal details: `.../auth/drive.appdata` and `...auth/drive.file` are the scopes the plug-in has access to.
+Unfortunately no, for security reasons the plug-in has access to only those files that _it creates_, and it has been made such that all vaults stay under the "obsidian" folder in Drive, and it can only access those files that it has created under that folder to make sure that it is not tampering/reading other sensitive files that the user might have. Here's some technical details: `.../auth/drive.appdata` and `...auth/drive.file` are the scopes the plug-in has access to.
 
 #### Q. What about security and privacy?  
 The plug-in has limited access to only those files it creates itself, so it can't read any other files on your Drive. While giving the plug-in the necessary permissions you can confirm it yourself. And as for the token exchange part a server has to be unfortunately involved. I have a server hosted (whose link is the LogIn link) which does the code exchange for you, you can however implement your own Google Cloud Project and retrieve the refresh token. The plug-in just requires the refresh token to work, how it is retrieved is none of it's concern. More info at https://github.com/stravo1/obsidian-gdrive-sync/issues/24
@@ -122,7 +122,7 @@ In the plugins data.json file, include the following fields to the JSON object, 
   You must ensure that your server is sending back the correct CORS headers, if things aren't working thats probably the cause. Just log the request and determine the origin you need to allow.
 
 #### Q. Notes created from templates get deleted automatically. How to solve it?  
-The plug-in uses the "lastSync" tag to keep track of synced files. So if a new note having the "lastSync" tag of the template from which it was created is detected by the plug-in it assumes that this "new" note was already synced as it has the "lastSync" tag (which is not true as it got the tag from the template) and as it can't find this "new" note on Drive (of cource it can't, it was never uploaded) it deletes the note to keep it in sync with Drive. Solution is to add the name of the template note/folder containing templates under the Blacklist option in settings and remove the "lastSync" tag from the template note(s) if it(they) has(have) the tag. 
+The plug-in uses the "lastSync" tag to keep track of synced files. So if a new note having the "lastSync" tag of the template from which it was created is detected by the plug-in it assumes that this "new" note was already synced as it has the "lastSync" tag (which is not true as it got the tag from the template) and as it can't find this "new" note on Drive (of course it can't, it was never uploaded) it deletes the note to keep it in sync with Drive. Solution is to add the name of the template note/folder containing templates under the Blacklist option in settings and remove the "lastSync" tag from the template note(s) if it(they) has(have) the tag. 
 
 #### Q. Files got deleted accidentally or due to plugin errors, what to do?  
 Do not panic, all files deleted by the plugin goes to the .trash folder in your vault folder in your desktop or mobile devices (provided you are using beta-11 or higher version of the plugin). You can get them from there. However for restoring them to the vault, do the following: disable this plugin, restore the required notes from .trash folder, remove the lastSync tag from the notes, enable plugin again. Not doing this will keep deleting the notes which were restored with the lastSync tag intact.
