@@ -2381,6 +2381,7 @@ class syncSettings extends PluginSettingTab {
 					this.plugin.saveSettings();
 				});
 			});
+		
 		/* -- LEGACY BUTTONS, CODE TO BE REMOVED -- */
 		// new Setting(containerEl)
 		// 	.setName("Upload all")
@@ -2476,6 +2477,89 @@ class syncSettings extends PluginSettingTab {
 					this.plugin.saveSettings();
 				});
 			});
+		/* ------------------------------------------------------------------ */
+		/* Advanced: configurable authentication endpoints                     */
+		/* These allow users to self-host the auth server instead of using the */
+		/* public default instance.                                            */
+		/* ------------------------------------------------------------------ */
+		containerEl.createEl("hr");
+		containerEl.createEl("p", {
+			text: "Authentication endpoints (Advanced)",
+		});
+		containerEl.createEl("p", {
+			text:
+				"Override these only if you are self-hosting the authentication server. " +
+				"Leave empty / click 'Reset' to use the public default endpoints.",
+			cls: "setting-item-description",
+		});
+
+		new Setting(containerEl)
+			.setName("Fetch refresh-token URL")
+			.setDesc(
+				"The page the user opens in a browser to obtain a Google refresh token (the 'Open this link to log in' link above points to this URL)."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder(
+						"https://your-auth-server/auth/obsidian"
+					)
+					.setValue(this.plugin.settings.fetchRefreshTokenURL)
+					.onChange(async (value) => {
+						this.plugin.settings.fetchRefreshTokenURL =
+							value.trim() ||
+							DEFAULT_SETTINGS.fetchRefreshTokenURL;
+						await this.plugin.saveSettings();
+						// Keep the visible login link in sync with the new value
+						const linkEl = sync.querySelector(
+							"a.sync_text"
+						) as HTMLAnchorElement | null;
+						if (linkEl) {
+							linkEl.href =
+								this.plugin.settings.fetchRefreshTokenURL;
+						}
+					})
+			)
+			.addExtraButton((btn) =>
+				btn
+					.setIcon("reset")
+					.setTooltip("Reset to default")
+					.onClick(async () => {
+						this.plugin.settings.fetchRefreshTokenURL =
+							DEFAULT_SETTINGS.fetchRefreshTokenURL;
+						await this.plugin.saveSettings();
+						this.display(); // re-render so the text field shows the default value
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Refresh access-token URL")
+			.setDesc(
+				"The server endpoint the plugin calls (with your refresh token) to obtain a fresh Google access token."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder(
+						"https://your-auth-server/auth/obsidian/refresh-token"
+					)
+					.setValue(this.plugin.settings.refreshAccessTokenURL)
+					.onChange(async (value) => {
+						this.plugin.settings.refreshAccessTokenURL =
+							value.trim() ||
+							DEFAULT_SETTINGS.refreshAccessTokenURL;
+						await this.plugin.saveSettings();
+					})
+			)
+			.addExtraButton((btn) =>
+				btn
+					.setIcon("reset")
+					.setTooltip("Reset to default")
+					.onClick(async () => {
+						this.plugin.settings.refreshAccessTokenURL =
+							DEFAULT_SETTINGS.refreshAccessTokenURL;
+						await this.plugin.saveSettings();
+						this.display(); // re-render so the text field shows the default value
+					})
+			);
 	}
 }
 
