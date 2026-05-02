@@ -235,8 +235,8 @@ export default class driveSyncPlugin extends Plugin {
 
 		pendingSyncFile instanceof TFile
 			? console.log(
-					JSON.parse(await this.app.vault.read(pendingSyncFile))
-			  )
+				JSON.parse(await this.app.vault.read(pendingSyncFile))
+			)
 			: console.log("No file");
 
 		let {
@@ -355,8 +355,7 @@ export default class driveSyncPlugin extends Plugin {
 				this.pendingSyncItems.shift();
 				await this.writeToPendingSyncFile();
 				new Notice(
-					`Synced ${pendingSyncItems.indexOf(item) + 1}/${
-						pendingSyncItems.length
+					`Synced ${pendingSyncItems.indexOf(item) + 1}/${pendingSyncItems.length
 					} changes`
 				);
 				await this.writeToVerboseLogFile(
@@ -540,7 +539,7 @@ export default class driveSyncPlugin extends Plugin {
 			}
 			if (
 				new Date(this.settings.accessTokenExpiryTime).getTime() -
-					new Date().getTime() <
+				new Date().getTime() <
 				1800000
 				// half hour
 			) {
@@ -623,7 +622,7 @@ export default class driveSyncPlugin extends Plugin {
 								await this.writeToErrorLogFile(err);
 								await this.writeToVerboseLogFile(
 									"LOG: Could not delete " +
-										`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
 								);
 							}
 							return;
@@ -696,17 +695,16 @@ export default class driveSyncPlugin extends Plugin {
 						} catch (err) {
 							await this.writeToVerboseLogFile(
 								"LOG: Couldn't create file and folder, details of path, file[0]: " +
-									path +
-									", " +
-									file[0]
+								path +
+								", " +
+								file[0]
 							);
 							await this.writeToErrorLogFile(err);
 							await this.notifyError();
 						}
 					}
 					new Notice(
-						`Downloaded ${toDownload.indexOf(dFile) + 1}/${
-							toDownload.length
+						`Downloaded ${toDownload.indexOf(dFile) + 1}/${toDownload.length
 						} files`,
 						1000
 					);
@@ -742,7 +740,7 @@ export default class driveSyncPlugin extends Plugin {
 							await this.writeToErrorLogFile(err);
 							await this.writeToVerboseLogFile(
 								"LOG: Could not create " +
-									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+								`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
 							);
 						}
 					}
@@ -878,10 +876,10 @@ export default class driveSyncPlugin extends Plugin {
 					forced == "forced" ||
 					(timeStamp /* check if timeStamp is present */ &&
 						cloudDate.getTime() >
-							new Date(timeStamp![0]).getTime() +
-								(isBinaryFile
-									? 5000
-									: 3000)) /* allow 3sec/5sec (needs to be tested) delay in 'localDate' */
+						new Date(timeStamp![0]).getTime() +
+						(isBinaryFile
+							? 5000
+							: 3000)) /* allow 3sec/5sec (needs to be tested) delay in 'localDate' */
 				) {
 					if (
 						isBinaryFile &&
@@ -1013,10 +1011,10 @@ export default class driveSyncPlugin extends Plugin {
 				await this.writeToErrorLogFile(err);
 				await this.writeToVerboseLogFile(
 					"LOG: Could not create attachment tracking file: " +
-						`${ATTACHMENT_TRACKING_FOLDER_NAME}/${e.path.replace(
-							/\//g,
-							"."
-						)}`
+					`${ATTACHMENT_TRACKING_FOLDER_NAME}/${e.path.replace(
+						/\//g,
+						"."
+					)}`
 				);
 			}
 
@@ -1044,7 +1042,7 @@ export default class driveSyncPlugin extends Plugin {
 
 		var metaExists = metaPattern.test(content);
 		var driveDataExists = driveDataPattern.test(content);
-		
+
 		const lastEditor = this.app.workspace.activeEditor;
 
 		if (metaExists) {
@@ -1176,8 +1174,7 @@ export default class driveSyncPlugin extends Plugin {
 					: "";
 				await this.app.vault.modify(
 					errorLogFile,
-					`${content}\n\n${new Date().toString()}-${log.name}-${
-						log.message
+					`${content}\n\n${new Date().toString()}-${log.name}-${log.message
 					}-${log.stack}`
 				);
 				this.errorLoggingForTheFirstTimeInThisSession = false;
@@ -1185,8 +1182,7 @@ export default class driveSyncPlugin extends Plugin {
 				try {
 					await this.app.vault.create(
 						ERROR_LOG_FILE_NAME,
-						`${new Date().toString()}-${log.name}-${log.message}-${
-							log.stack
+						`${new Date().toString()}-${log.name}-${log.message}-${log.stack
 						}`
 					);
 				} catch (err) {
@@ -1347,9 +1343,9 @@ export default class driveSyncPlugin extends Plugin {
 					pendingSyncFile instanceof TFile
 						? JSON.parse(await this.app.vault.read(pendingSyncFile))
 						: {
-								pendingSyncItems: [],
-								finalNamesForFileID: new Map(),
-						  };
+							pendingSyncItems: [],
+							finalNamesForFileID: new Map(),
+						};
 
 				this.pendingSyncItems = [...pendingSyncItems];
 				this.finalNamesForFileID = objectToMap(finalNamesForFileID);
@@ -1780,7 +1776,7 @@ export default class driveSyncPlugin extends Plugin {
 						await this.writeToErrorLogFile(err);
 						await this.writeToVerboseLogFile(
 							"LOG: Could not delete " +
-								`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+							`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
 						);
 					}
 				}
@@ -1903,7 +1899,7 @@ export default class driveSyncPlugin extends Plugin {
 							}
 							let lastItemOnPendingSync =
 								this.pendingSyncItems[
-									this.pendingSyncItems.length - 1
+								this.pendingSyncItems.length - 1
 								];
 							if (
 								lastItemOnPendingSync?.fileID == id &&
@@ -1979,7 +1975,7 @@ export default class driveSyncPlugin extends Plugin {
 								if (
 									Math.abs(
 										new Date(timeStamp[0]).getTime() -
-											new Date(e.stat.mtime).getTime()
+										new Date(e.stat.mtime).getTime()
 									) < 1000
 								) {
 									// same code repeated, deal with it later
@@ -2178,15 +2174,14 @@ export default class driveSyncPlugin extends Plugin {
 				this.settings.forceFocus = !this.settings.forceFocus;
 				await this.saveSettings();
 				new Notice(
-					`Force focus is now ${
-						this.settings.forceFocus ? "enabled" : "disabled"
+					`Force focus is now ${this.settings.forceFocus ? "enabled" : "disabled"
 					}`
 				);
 			},
 		});
 	}
 
-	onunload() {}
+	onunload() { }
 
 	async loadSettings() {
 		this.settings = Object.assign(
@@ -2320,163 +2315,164 @@ class syncSettings extends PluginSettingTab {
 					this.plugin.saveSettings();
 				})
 			);
-		if (!this.plugin.settings.validToken) return; // bodge 1
-		if (!this.plugin.settings.vaultInit) {
-			new Setting(containerEl)
-				.setName("Initialize vault")
-				.setDesc(
-					"Create vault and sync all files to Google Drive. DO NOT use this button if you are getting errors related to root folder!"
-				)
-				.addButton((button) => {
-					button.setButtonText("Proceed");
-					button.onClick(
-						async () => await this.plugin.cleanInstall()
-					);
-				});
-			new Setting(containerEl)
-				.setName("Create Root Folder Forecfully")
-				.setDesc(
-					"Experimental: Use this only if you get an error related to root folder."
-				)
-				.addButton((button) => {
-					button.setButtonText("Proceed");
-					button.onClick(async () => {
-						this.plugin.settings.rootFolderId = await uploadFolder(
-							this.plugin.settings.accessToken,
-							"obsidian"
+		if (this.plugin.settings.validToken) {
+			if (!this.plugin.settings.vaultInit) {
+				new Setting(containerEl)
+					.setName("Initialize vault")
+					.setDesc(
+						"Create vault and sync all files to Google Drive. DO NOT use this button if you are getting errors related to root folder!"
+					)
+					.addButton((button) => {
+						button.setButtonText("Proceed");
+						button.onClick(
+							async () => await this.plugin.cleanInstall()
 						);
-						new Notice(
-							"Root folder created, please reload the plugin."
-						);
+					});
+				new Setting(containerEl)
+					.setName("Create Root Folder Forecfully")
+					.setDesc(
+						"Experimental: Use this only if you get an error related to root folder."
+					)
+					.addButton((button) => {
+						button.setButtonText("Proceed");
+						button.onClick(async () => {
+							this.plugin.settings.rootFolderId = await uploadFolder(
+								this.plugin.settings.accessToken,
+								"obsidian"
+							);
+							new Notice(
+								"Root folder created, please reload the plugin."
+							);
+							this.plugin.saveSettings();
+						});
+					});
+				return;
+			}
+			new Setting(containerEl)
+				.setName("Set refresh time")
+				.setDesc(
+					"Enter the time in seconds after which the plugin checks for changed content. [Reload required]"
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("Enter time")
+						.setValue(this.plugin.settings.refreshTime)
+						.onChange(async (value) => {
+							this.plugin.settings.refreshTime = value;
+							this.plugin.saveSettings();
+						})
+				);
+			new Setting(containerEl)
+				.setName("Auto refresh binary files")
+				.setDesc(
+					"Experimental: Automatically fetch lastest binary files. Currently this plugin doesn't completely support binary file sync."
+				)
+				.addDropdown((selector) => {
+					selector.addOption("1", "Fetch");
+					selector.addOption("0", "Don't fetch");
+					selector.setValue(this.plugin.settings.autoRefreshBinaryFiles);
+					selector.onChange((val) => {
+						this.plugin.settings.autoRefreshBinaryFiles = val;
 						this.plugin.saveSettings();
 					});
 				});
-			return;
+
+			/* -- LEGACY BUTTONS, CODE TO BE REMOVED -- */
+			// new Setting(containerEl)
+			// 	.setName("Upload all")
+			// 	.setDesc(
+			// 		"Upload all files to Google Drive, thus DELETING ALL PREVIOUS FILES"
+			// 	)
+			// 	.addButton((button) =>
+			// 		button.setIcon("cloud").onClick(async () => {
+			// 			new Notice("Clearing vault in Google Drive...");
+			// 			await deleteFile(
+			// 				this.plugin.settings.accessToken,
+			// 				this.plugin.settings.vaultId
+			// 			);
+			// 			await this.plugin.cleanInstall();
+			// 		})
+			// 	);
+			// new Setting(containerEl)
+			// 	.setName("Download all")
+			// 	.setDesc(
+			// 		"Download all files from Google Drive, thus DELETING ALL PREVIOUS FILES"
+			// 	)
+			// 	.addButton((button) =>
+			// 		button.setIcon("install").onClick(async () => {
+			// 			new Notice("Clearing vault...");
+			// 			var filesList = this.app.vault.getFiles();
+			// 			this.plugin.settings.refresh = true;
+			// 			for (const file of filesList) {
+			// 				this.app.vault.delete(file, true);
+			// 			}
+			// 			new Notice("Downloading files...");
+			// 			for (const file of this.plugin.settings.filesList) {
+			// 				//console.log(file);
+
+			// 				var res = await getFile(
+			// 					this.plugin.settings.accessToken,
+			// 					file.id
+			// 				);
+			// 				await this.app.vault
+			// 					.createBinary(res[0], res[1])
+			// 					.catch(async () => {
+			// 						var path = res[0]
+			// 							.split("/")
+			// 							.slice(0, -1)
+			// 							.join("/");
+			// 						//console.log(path);
+
+			// 						await this.app.vault.createFolder(path);
+			// 						await this.app.vault.createBinary(
+			// 							res[0],
+			// 							res[1]
+			// 						);
+			// 					});
+			// 			}
+			// 			this.plugin.settings.refresh = false;
+			// 			new Notice("Sync complete :)");
+			// 		})
+			// 	);
+			new Setting(containerEl)
+				.setName("Blacklist paths")
+				.setDesc(
+					"Add names for folders and files which should not be tracked by the plugin separated by comma. Example: templateFolder,dailyTemplateNote,file1,folder1 . NOTE: If folder name(s) is(are) mentioned, all files and folders under the mentioned folder would also be ignored."
+				)
+				.addTextArea((textArea) => {
+					textArea
+						.setValue(this.plugin.settings.blacklistPaths.join(","))
+						.onChange((value) => {
+							this.plugin.settings.blacklistPaths = value.split(",");
+						});
+				});
+			new Setting(containerEl)
+				.setName("Force Focus Mode")
+				.setDesc(
+					"Experimental: Forcefully bring the note in focus after each sync. Solves #45 issue on Github, but also introduces #75 issue. TLDR: Useful while working with tables, etc. when you lose focus while editing. Keep disabled otherwise. You can quickly toggle this setting using the command 'Toggle Force Focus Mode' in the command palette."
+				)
+				.addToggle((toggle) => {
+					toggle.setValue(this.plugin.settings.forceFocus);
+					toggle.onChange((val) => {
+						this.plugin.settings.forceFocus = val;
+						this.plugin.saveSettings();
+					});
+				});
+			new Setting(containerEl)
+				.setName(
+					"Remove merging changes notices automatically (NOT RECOMMENDED)"
+				)
+				.setDesc(
+					"This enables a hacky fix that removes any merging changes notice that sometimes appears while typing. It does not prevent the notice from appearing but rather removes it as soon as it appears."
+				)
+				.addToggle((toggle) => {
+					toggle.setValue(this.plugin.settings.removeMergeNotifsSettings);
+					toggle.onChange((val) => {
+						this.plugin.settings.removeMergeNotifsSettings = val;
+						this.plugin.saveSettings();
+					});
+				});
 		}
-		new Setting(containerEl)
-			.setName("Set refresh time")
-			.setDesc(
-				"Enter the time in seconds after which the plugin checks for changed content. [Reload required]"
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("Enter time")
-					.setValue(this.plugin.settings.refreshTime)
-					.onChange(async (value) => {
-						this.plugin.settings.refreshTime = value;
-						this.plugin.saveSettings();
-					})
-			);
-		new Setting(containerEl)
-			.setName("Auto refresh binary files")
-			.setDesc(
-				"Experimental: Automatically fetch lastest binary files. Currently this plugin doesn't completely support binary file sync."
-			)
-			.addDropdown((selector) => {
-				selector.addOption("1", "Fetch");
-				selector.addOption("0", "Don't fetch");
-				selector.setValue(this.plugin.settings.autoRefreshBinaryFiles);
-				selector.onChange((val) => {
-					this.plugin.settings.autoRefreshBinaryFiles = val;
-					this.plugin.saveSettings();
-				});
-			});
-		
-		/* -- LEGACY BUTTONS, CODE TO BE REMOVED -- */
-		// new Setting(containerEl)
-		// 	.setName("Upload all")
-		// 	.setDesc(
-		// 		"Upload all files to Google Drive, thus DELETING ALL PREVIOUS FILES"
-		// 	)
-		// 	.addButton((button) =>
-		// 		button.setIcon("cloud").onClick(async () => {
-		// 			new Notice("Clearing vault in Google Drive...");
-		// 			await deleteFile(
-		// 				this.plugin.settings.accessToken,
-		// 				this.plugin.settings.vaultId
-		// 			);
-		// 			await this.plugin.cleanInstall();
-		// 		})
-		// 	);
-		// new Setting(containerEl)
-		// 	.setName("Download all")
-		// 	.setDesc(
-		// 		"Download all files from Google Drive, thus DELETING ALL PREVIOUS FILES"
-		// 	)
-		// 	.addButton((button) =>
-		// 		button.setIcon("install").onClick(async () => {
-		// 			new Notice("Clearing vault...");
-		// 			var filesList = this.app.vault.getFiles();
-		// 			this.plugin.settings.refresh = true;
-		// 			for (const file of filesList) {
-		// 				this.app.vault.delete(file, true);
-		// 			}
-		// 			new Notice("Downloading files...");
-		// 			for (const file of this.plugin.settings.filesList) {
-		// 				//console.log(file);
-
-		// 				var res = await getFile(
-		// 					this.plugin.settings.accessToken,
-		// 					file.id
-		// 				);
-		// 				await this.app.vault
-		// 					.createBinary(res[0], res[1])
-		// 					.catch(async () => {
-		// 						var path = res[0]
-		// 							.split("/")
-		// 							.slice(0, -1)
-		// 							.join("/");
-		// 						//console.log(path);
-
-		// 						await this.app.vault.createFolder(path);
-		// 						await this.app.vault.createBinary(
-		// 							res[0],
-		// 							res[1]
-		// 						);
-		// 					});
-		// 			}
-		// 			this.plugin.settings.refresh = false;
-		// 			new Notice("Sync complete :)");
-		// 		})
-		// 	);
-		new Setting(containerEl)
-			.setName("Blacklist paths")
-			.setDesc(
-				"Add names for folders and files which should not be tracked by the plugin separated by comma. Example: templateFolder,dailyTemplateNote,file1,folder1 . NOTE: If folder name(s) is(are) mentioned, all files and folders under the mentioned folder would also be ignored."
-			)
-			.addTextArea((textArea) => {
-				textArea
-					.setValue(this.plugin.settings.blacklistPaths.join(","))
-					.onChange((value) => {
-						this.plugin.settings.blacklistPaths = value.split(",");
-					});
-			});
-		new Setting(containerEl)
-			.setName("Force Focus Mode")
-			.setDesc(
-				"Experimental: Forcefully bring the note in focus after each sync. Solves #45 issue on Github, but also introduces #75 issue. TLDR: Useful while working with tables, etc. when you lose focus while editing. Keep disabled otherwise. You can quickly toggle this setting using the command 'Toggle Force Focus Mode' in the command palette."
-			)
-			.addToggle((toggle) => {
-				toggle.setValue(this.plugin.settings.forceFocus);
-				toggle.onChange((val) => {
-					this.plugin.settings.forceFocus = val;
-					this.plugin.saveSettings();
-				});
-			});
-		new Setting(containerEl)
-			.setName(
-				"Remove merging changes notices automatically (NOT RECOMMENDED)"
-			)
-			.setDesc(
-				"This enables a hacky fix that removes any merging changes notice that sometimes appears while typing. It does not prevent the notice from appearing but rather removes it as soon as it appears."
-			)
-			.addToggle((toggle) => {
-				toggle.setValue(this.plugin.settings.removeMergeNotifsSettings);
-				toggle.onChange((val) => {
-					this.plugin.settings.removeMergeNotifsSettings = val;
-					this.plugin.saveSettings();
-				});
-			});
 		/* ------------------------------------------------------------------ */
 		/* Advanced: configurable authentication endpoints                     */
 		/* These allow users to self-host the auth server instead of using the */
