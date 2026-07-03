@@ -207,6 +207,9 @@ export default class driveSyncPlugin extends Plugin {
 	adapter: FileSystemAdapter;
 	attachmentTrackingInitializationComplete: boolean = false;
 	layoutReady: boolean = false;
+	// Serialized copy of the last filesList we persisted, so the periodic refresh
+	// only rewrites data.json when the cloud file list actually changed.
+	lastSavedFilesListJSON: string = "";
 
 	completeAllPendingSyncs = async () => {
 		if (!this.app.workspace.layoutReady) {
@@ -598,40 +601,61 @@ export default class driveSyncPlugin extends Plugin {
 				"LOG: Deleting files in refreshAll"
 			);
 			/* delete tracked but not-in-drive-anymore files */
-			this.app.vault.getFiles().map(async (file) => {
-				if (
-					!this.cloudFiles.includes(file.path) &&
-					!this.renamingList.includes(file.path) &&
-					!this.deletingList.includes(file.path) &&
-					file.path != this.currentlyUploading
-				) {
-					if (file.extension != "md") {
-						if (await this.isAttachmentSynced(file.path)) {
-							this.app.vault.trash(file, false);
-							let convertedSafeFilename = file.path.replace(
-								/\//g,
-								"."
-							);
-							try {
-								await this.adapter.remove(
-									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+			/*
+			Only reconcile local deletions when the cloud list is non-empty. An empty
+			`cloudFiles` almost always means an error / not-yet-initialized state rather
+			than "the user intentionally deleted every note from Drive", and acting on it
+			is harmful on two fronts:
+			  - Safety: it would `vault.trash()` every local note carrying the sync
+			    frontmatter, i.e. wipe the whole vault.
+			  - Performance: it would `vault.read()` EVERY local file on every refresh
+			    tick, saturating Obsidian's file I/O and starving the editor's own reads
+			    (this was the cause of the multi-second lag when opening notes).
+			The loop is also a sequential, awaited `for...of` instead of a fire-and-forget
+			`.map(async ...)`, so refreshAll does not resolve while a batch of reads is
+			still draining. Previously that left `alreadyRefreshing` false and allowed the
+			next 5s tick to stack another batch on top, compounding the I/O backlog.
+			*/
+			if (this.cloudFiles.length) {
+				for (const file of this.app.vault.getFiles()) {
+					if (
+						!this.cloudFiles.includes(file.path) &&
+						!this.renamingList.includes(file.path) &&
+						!this.deletingList.includes(file.path) &&
+						file.path != this.currentlyUploading
+					) {
+						if (file.extension != "md") {
+							if (await this.isAttachmentSynced(file.path)) {
+								this.app.vault.trash(file, false);
+								let convertedSafeFilename = file.path.replace(
+									/\//g,
+									"."
 								);
-							} catch (err) {
-								await this.writeToErrorLogFile(err);
-								await this.writeToVerboseLogFile(
-									"LOG: Could not delete " +
-									`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
-								);
+								try {
+									await this.adapter.remove(
+										`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+									);
+								} catch (err) {
+									await this.writeToErrorLogFile(err);
+									await this.writeToVerboseLogFile(
+										"LOG: Could not delete " +
+										`${ATTACHMENT_TRACKING_FOLDER_NAME}/${convertedSafeFilename}`
+									);
+								}
+								continue;
 							}
-							return;
+						}
+						var content = await this.app.vault.read(file);
+						if (driveDataPattern.test(content)) {
+							this.app.vault.trash(file, false);
 						}
 					}
-					var content = await this.app.vault.read(file);
-					if (driveDataPattern.test(content)) {
-						this.app.vault.trash(file, false);
-					}
 				}
-			});
+			} else {
+				await this.writeToVerboseLogFile(
+					"LOG: cloudFiles empty, skipping reconciliation/trash (safety)"
+				);
+			}
 
 			await this.writeToVerboseLogFile(
 				"LOG: Downloading missing files in refreshAll"
@@ -1144,7 +1168,14 @@ export default class driveSyncPlugin extends Plugin {
 			this.checkForConnectivity();
 			await this.writeToErrorLogFile(err);
 		}
-		this.saveSettings();
+		// This runs on every refresh tick (default every 5s). Only rewrite data.json
+		// when the cloud file list actually changed, to avoid needless write churn on
+		// Obsidian's file-I/O queue.
+		const newFilesListJSON = JSON.stringify(this.settings.filesList);
+		if (newFilesListJSON !== this.lastSavedFilesListJSON) {
+			this.lastSavedFilesListJSON = newFilesListJSON;
+			this.saveSettings();
+		}
 		await this.writeToVerboseLogFile(
 			"LOG: Exiting refreshFilesListInDriveAndStoreInSettings"
 		);
