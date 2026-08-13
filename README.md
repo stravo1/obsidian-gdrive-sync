@@ -152,11 +152,11 @@ If you have suggestions, encounter issues, or want to contribute to its developm
 
 ## Star History
 
-<a href="https://star-history.com/#stravo1/obsidian-gdrive-sync&Date">
+<a href="https://star-history.dera.page/#stravo1/obsidian-gdrive-sync&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=stravo1/obsidian-gdrive-sync&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=stravo1/obsidian-gdrive-sync&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=stravo1/obsidian-gdrive-sync&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=stravo1/obsidian-gdrive-sync&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=stravo1/obsidian-gdrive-sync&type=Date" />
+   <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=stravo1/obsidian-gdrive-sync&type=Date" />
  </picture>
 </a>
 
