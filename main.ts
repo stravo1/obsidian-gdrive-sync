@@ -103,6 +103,26 @@ const getAccessToken = async (
 	return response;
 };
 
+// Run an async worker over `items` with at most `limit` in flight at once.
+// Used to parallelize the initial vault upload instead of one file at a time.
+const runWithConcurrency = async <T>(
+	items: T[],
+	limit: number,
+	worker: (item: T, index: number) => Promise<void>
+) => {
+	let next = 0;
+	const runners = new Array(Math.max(1, Math.min(limit, items.length)))
+		.fill(0)
+		.map(async () => {
+			while (true) {
+				const i = next++;
+				if (i >= items.length) return;
+				await worker(items[i], i);
+			}
+		});
+	await Promise.all(runners);
+};
+
 // inital idea from : https://github.com/stravo1/obsidian-gdrive-sync/commit/55d1c05e06ead00f9a9b86f0b8a8c0a821ce68f3
 // thanks to https://github.com/RedMarbles1 for the contribution
 
@@ -501,15 +521,39 @@ export default class driveSyncPlugin extends Plugin {
 			var filesList = this.app.vault.getFiles();
 			let noOfFiles = filesList.length;
 			let count = 0;
-			for (const file of filesList) {
-				// const buffer: any = await this.app.vault.readBinary(file);
-				if (file.extension != "md") {
-					await this.uploadNewAttachment(file);
-				} else {
-					await this.uploadNewNotesFile(file);
+			let failures: string[] = [];
+			// Upload several files at once instead of strictly one-at-a-time.
+			// Kept modest to stay well under Google Drive's per-user rate
+			// limits; a single file's failure no longer aborts the whole init.
+			const UPLOAD_CONCURRENCY = 5;
+			await runWithConcurrency(
+				filesList,
+				UPLOAD_CONCURRENCY,
+				async (file) => {
+					try {
+						if (file.extension != "md") {
+							await this.uploadNewAttachment(file);
+						} else {
+							await this.uploadNewNotesFile(file);
+						}
+					} catch (e) {
+						failures.push(file.path);
+						await this.writeToErrorLogFile(e as Error);
+					}
+					count++;
+					// Throttle notices so concurrent uploads don't spam.
+					if (count % 10 === 0 || count === noOfFiles) {
+						new Notice(
+							"Uploaded " + count + "/" + noOfFiles + " files"
+						);
+					}
 				}
-				count++;
-				new Notice("Uploaded " + count + "/" + noOfFiles + " files");
+			);
+			if (failures.length) {
+				new Notice(
+					`${failures.length}/${noOfFiles} file(s) failed to upload. Check the error log and re-run sync.`,
+					8000
+				);
 			}
 			new Notice("Files uploaded!");
 			new Notice("Please reload the plug-in.", 5000);
