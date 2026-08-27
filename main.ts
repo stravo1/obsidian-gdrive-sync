@@ -92,11 +92,58 @@ const getAccessToken = async (
 			response = res.data;
 		})
 		.catch((err) => {
-			if ((err.code = "ERR_NETWORK") && showError) {
-				new Notice("Oops! Network error :(");
-				new Notice("Or maybe no refresh token provided?", 5000);
+			if (err.response) {
+				// The auth server answered with a non-2xx status. This is the
+				// common misconfiguration case: 404 => wrong URL/path,
+				// 400/401 => Google rejected the refresh token (invalid_grant),
+				// 5xx => the server/token exchange itself failed. Surface the
+				// actual status/body instead of a generic "login failed".
+				const status = err.response.status;
+				const body =
+					typeof err.response.data === "object"
+						? JSON.stringify(err.response.data)
+						: String(err.response.data ?? "");
+				// Full technical detail (status, endpoint, response body) goes
+				// to the console for developers; the user-facing Notice stays
+				// plain-language and actionable.
+				console.error(
+					`getAccessToken: HTTP ${status} from ${refreshAccessTokenURL} :: ${body}`
+				);
+				if (showError) {
+					if (status === 404) {
+						new Notice(
+							"Login failed: couldn't find the login server. Check the refresh-token URL in settings.",
+							9000
+						);
+					} else if (status === 400 || status === 401) {
+						new Notice(
+							"Login failed: your token was rejected. Re-generate your refresh token from the login link.",
+							9000
+						);
+					} else {
+						new Notice("Login failed. Please try again.", 8000);
+					}
+				}
+				response = "error";
+			} else if (err.code === "ERR_NETWORK" || err.request) {
+				// Request was sent but no response came back: offline, wrong
+				// host, DNS failure, or a CORS block from the auth server. The
+				// technical hint (incl. CORS) is logged, not shown to the user.
+				console.error(
+					`getAccessToken: network error :: ${err.message} (check connectivity, the URL, and that the auth server sends CORS headers)`
+				);
+				if (showError) {
+					new Notice(
+						"Login failed: couldn't reach the login server. Check your connection and the refresh-token URL.",
+						6000
+					);
+				}
 				response = "network_error";
 			} else {
+				console.error(`getAccessToken: ${err.message}`);
+				if (showError) {
+					new Notice("Login failed. Please try again.", 6000);
+				}
 				response = "error";
 			}
 		});
@@ -2281,9 +2328,10 @@ class syncSettings extends PluginSettingTab {
 					setIcon(sync_icons, "sync");
 					var res: any = await getAccessToken(
 						this.plugin.settings.refreshToken,
-						this.plugin.settings.refreshAccessTokenURL
+						this.plugin.settings.refreshAccessTokenURL,
+						true
 					); // check for accesstoken
-					if (res != "error") {
+					if (res && res.access_token) {
 						// display status accordingly
 						this.plugin.settings.accessToken = res.access_token;
 						this.plugin.settings.validToken = true;
